@@ -14,7 +14,8 @@ from PySide6.QtCore import QModelIndex, QRect, QSize, Qt
 from PySide6.QtGui import QAction, QPen, QColor, QPainter, QKeySequence, QUndoStack, QFont
 from pip import main
 import BlackBoxr
-from BlackBoxr.mainwindow.Graphics import DiagramScene, DiagramViewer, NodeBase, Socket
+from BlackBoxr.graphics.viewer import DiagramScene, DiagramViewer
+from BlackBoxr.graphics.nodes import  DesignNode, NodeBase, Socket
 from BlackBoxr.mainwindow.dashboard.home import Dashboard, SystemRepresenter
 from BlackBoxr.mainwindow.widgets import DetachableTabWidget, GlobalSettingsDialog
 from BlackBoxr.misc import configuration, objects, Datatypes
@@ -23,6 +24,9 @@ class MainWindow_LEGACY(QMainWindow):
     '''Main window for the application'''
     def __init__(self, parent: Optional[PySide6.QtWidgets.QWidget] = None, flags: PySide6.QtCore.Qt.WindowFlags = None) -> None:
         super().__init__()
+        self.setupUI()
+
+    def setupUI(self):
         self.setWindowTitle("BlackBoxr")
         self.centralwidget = QWidget(self)
         self.centralwidget.setObjectName(u"centralwidget")
@@ -128,6 +132,9 @@ class MainWindow(QWidget):
         super().__init__()
         self.setupMenuBar()
         self.resize(int(configuration.winx), int(configuration.winy))
+        self.setupUI()
+
+    def setupUI(self):
         self.verticalLayout = QVBoxLayout()
         self.setLayout(self.verticalLayout)
         self.verticalLayout.setObjectName(u"verticalLayout")
@@ -199,16 +206,19 @@ class MainWindow(QWidget):
         canvasview = DiagramViewer(scene)
         self.mainTabbedWidget.addTab(canvasview, "Test Canvas")
         scene.setSceneRect(0,0,5000,5000)
-        self.db = NodeBase()
+        self.db = DesignNode()
         scene.addItem(self.db)
         self.db.setPos(100, 100)
 
-        socketA = Socket(self.db)
-        socketB = Socket(self.db, vertical=True)
-        scene.addItem(socketA)
-        scene.addItem(socketB)
-        socketA.setPos(200, 100)
-        socketB.setPos(250, 100)
+        leftsockets = [Socket(self.db) for x in range(11)]
+        rightsockets = [Socket(self.db) for x in range(2)]
+        bottomsockets = [Socket(self.db, vertical=True) for x in range(5)]
+        topsockets = [Socket(self.db, vertical=True) for x in range(10)]
+
+        self.db.rightTerminals += rightsockets
+        self.db.bottomTerminals += bottomsockets
+        self.db.leftTerminals += leftsockets
+        self.db.topTerminals += topsockets
 
         self.setWindowTitle(objects.qapp.applicationName())
         self.label.setText(u"Ico")

@@ -18,8 +18,6 @@ __description__ = "A visual tool for designing systems."
 basedir = os.path.dirname(os.path.realpath(__file__))
 libdir =  os.path.normpath(basedir + os.sep + os.pardir) + "\\FunctionLibraries\\"
 
-
-
 thidpartymodules = {}
 
 # Load Function Libraries
