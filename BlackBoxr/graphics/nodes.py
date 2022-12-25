@@ -1,3 +1,4 @@
+import copy
 from enum import Enum
 import inspect
 import math
@@ -59,7 +60,6 @@ class NodeBase( QGraphicsItem ):
 
     def hoverLeaveEvent(self, event):
         QApplication.instance().restoreOverrideCursor()
-        self.previewSocket = None
 
     def itemChange(self, change: QtWidgets.QGraphicsItem.GraphicsItemChange, value: typing.Any) -> typing.Any:
         if change == QGraphicsItem.ItemPositionChange:
@@ -93,7 +93,8 @@ class DesignNode(NodeBase):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.previewSocket = None
+        self.previewSocket : Socket = Socket(None, False, 255/2)
+        self.previewActive = False
 
         self.leftTerminals    : list[Socket] = []
         self.rightTerminals   : list[Socket] = []
@@ -114,7 +115,40 @@ class DesignNode(NodeBase):
         return QRectF(0, 0, max(width, basesize.width()), max(height, basesize.height()))
 
     def hoverMoveEvent(self, event: QtWidgets.QGraphicsSceneHoverEvent) -> None:
+        self.removePreviewSocket()
+        zone = self.determineClosestTerminalZone(event.pos())
+        if not isinstance(zone, NoneType):
+            self.previewSocket.setParentItem(self)
+            self.previewSocket.vertical = zone[1]
+            zone[0].append(self.previewSocket)
+            self.previewSocket.spriteOpacity = (255/2)
+            self.previewActive = True
+            self.update()
+            
 
+    def hoverLeaveEvent(self, event):
+        super().hoverLeaveEvent(event)
+        self.removePreviewSocket()
+
+    def mousePressEvent(self, event: QtWidgets.QGraphicsSceneMouseEvent) -> None:
+        super().mousePressEvent(event)
+
+    def materializePreview(self, pos):
+        socketzone = self.determineClosestTerminalZone(pos)
+        sock = Socket(self, vertical=socketzone[1], preview=False)
+        socketzone[0].append(sock)
+        return sock
+            
+
+    def removePreviewSocket(self):
+        # Remove preview socket from all terminal lists
+        [terminalList.remove(self.previewSocket) if self.previewSocket in terminalList else None for terminalList in [self.leftTerminals, self.rightTerminals, self.topTerminals, self.bottomTerminals]]
+        self.previewSocket.setParentItem(None)
+        self.previewSocket.spriteOpacity = 0
+        self.previewActive = False
+        self.update()
+
+    def determineClosestTerminalZone(self, inpos) -> typing.Union[tuple[list, bool], NoneType]:
         bounds = self.boundingRect()
         hpadding = bounds.width() * 0.2
         vpadding = bounds.height() * 0.2
@@ -124,26 +158,30 @@ class DesignNode(NodeBase):
         topregion = QRectF(bounds.x(), bounds.y(), bounds.width(), vpadding)
         botregion = QRectF(bounds.x(), bounds.height() - vpadding, bounds.width(), vpadding)
 
-        centertop = QPointF(bounds.width()/2, bounds.y())
-        centerleft = QPointF(bounds.x(), bounds.height()/2)
-        centerbot = QPointF(bounds.width()/2, bounds.height())
-        centerright = QPointF(bounds.width(), bounds.height()/2)
-
-        if leftregion.contains(event.pos()) or rightregion.contains(event.pos()) or topregion.contains(event.pos()) or botregion.contains(event.pos()):
-
-            closestpoint = closestPoint(event.pos(), [centerbot, centerleft, centerright, centertop])
+        if leftregion.contains(inpos) or rightregion.contains(inpos) or topregion.contains(inpos) or botregion.contains(inpos):
+            centertop = QPointF(bounds.width()/2, bounds.y())
+            centerleft = QPointF(bounds.x(), bounds.height()/2)
+            centerbot = QPointF(bounds.width()/2, bounds.height())
+            centerright = QPointF(bounds.width(), bounds.height()/2)
+            closestpoint = closestPoint(inpos, [centerbot, centerleft, centerright, centertop])
+            
+            targetlist = None
+            vertical = False
 
             if leftregion.contains(closestpoint):
-                pass
+                targetlist = self.leftTerminals
             elif rightregion.contains(closestpoint):
-                pass
+                targetlist = self.rightTerminals
             elif topregion.contains(closestpoint):
-                pass
+                targetlist = self.topTerminals
+                vertical = True
             elif botregion.contains(closestpoint):
-                pass
+                targetlist = self.bottomTerminals
+                vertical = True
+            return (targetlist, vertical)
+        else:
+            return None
 
-        self.update()
-    
     def paint(self, painter, option, widget):
         super().paint(painter, option, widget)
         # Calculate horizontal Terminal offsets
@@ -175,7 +213,7 @@ class Socket(QGraphicsItem):
 
     PILLSIZE = QRectF( 0, 0, 20, 5)
 
-    def __init__(self, parent, vertical = False) -> None:
+    def __init__(self, parent, vertical = False, preview = False) -> None:
         
         super( Socket, self ).__init__(parent=parent )
         self.parentNode = parent
@@ -184,6 +222,8 @@ class Socket(QGraphicsItem):
         self.traces = []
         self.vertical = vertical
         self.setFlags(self.flags() | QGraphicsItem.GraphicsItemFlag.ItemIsSelectable | QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
+        self.preview = preview
+        self.spriteOpacity = 255/2 if self.preview else 255 
 
     def paint(self, painter, option, widget):
         
@@ -193,9 +233,9 @@ class Socket(QGraphicsItem):
         pen = painter.pen()
         pen.setCapStyle(Qt.RoundCap)
         pen.setWidth(Socket.PILLSIZE.height())
-        pen.setColor(QColor(255, 255, 255, 255))
+        
+        pen.setColor(QColor(255, 255, 255, self.spriteOpacity))
         painter.setPen(pen)
-        #painter.drawLine(pos[0], pos[3]/2, pos[2], pos[3]/2)
         painter.drawRect(self.boundingRect())
 
         if self.isSelected():
@@ -214,30 +254,41 @@ class Socket(QGraphicsItem):
             return QRectF(pos[0], pos[1], pos[2], pos[3])
 
     def mousePressEvent(self, event):
-        if objects.qapp.keyboardModifiers() == Qt.ControlModifier:
-            self.__trace = OldArrowItem(endItem=self.scene().selectedItems()[0], startItem=self, parent=None)
-            self.__trace.setZValue(0)
-            self.__trace.setPos(self.scenePos())
-            self.scene().addItem(self.__trace)
-            self.setSelected(False)
-        
-        elif objects.qapp.keyboardModifiers() == Qt.AltModifier:
-            self.scene().removeItem(self.__trace)
-            self.__trace = None
+
+        if self.preview:
+
+            if isinstance(self.parentItem(), DesignNode):
+                socket = self.parentItem().materializePreview(self.mapToItem(self.parentItem(), event.pos()))
+                for item in self.scene().selectedItems():
+                    item.setSelected(False)
+                socket.setSelected(True)
+
         else:
-            for item in self.scene().selectedItems():
-                item.setSelected(False)
-            self.setSelected(True)
+
+            if objects.qapp.keyboardModifiers() == Qt.ControlModifier:
+                self.__trace = OldArrowItem(endItem=self.scene().selectedItems()[0], startItem=self, parent=None)
+                self.__trace.setZValue(0)
+                self.__trace.setPos(self.scenePos())
+                self.scene().addItem(self.__trace)
+                self.setSelected(False)
+            
+            elif objects.qapp.keyboardModifiers() == Qt.AltModifier:
+                self.scene().removeItem(self.__trace)
+                self.__trace = None
+            else:
+                for item in self.scene().selectedItems():
+                    item.setSelected(False)
+                self.setSelected(True)
 
     def mouseReleaseEvent(self, event):
         
         if not isinstance(self.__trace, NoneType):
-            self.__trace.setZValue(0)
-        self.__trace.setZValue(-10)
-        if not isinstance(self.scene().itemAt(event.scenePos(), QTransform()), Socket):
+            self.__trace.setZValue(-10)
+        if not isinstance(self.scene().itemAt(event.scenePos(), QTransform()), Socket) and not isinstance(self.__trace, NoneType):
             self.scene().removeItem(self.__trace)
             self.__trace = None
-        else: self.__trace.setZValue(10)
+        elif not isinstance(self.__trace, NoneType): 
+            self.__trace.setZValue(10)
 
     def mouseMoveEvent(self, event: QtWidgets.QGraphicsSceneMouseEvent) -> None:
         if isinstance(self.__trace, NoneType):
