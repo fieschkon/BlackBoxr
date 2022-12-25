@@ -158,3 +158,4 @@ ex.py
 .vscode/
 .DS_Store
 *.pyc
+*.pyc
