@@ -21,29 +21,14 @@ from BlackBoxr.utilities import closestPoint
 GRIDSIZE = (25, 25)
 ENDOFFSET = -QPointF(25, 25)
 
-
 class NodeBase( QGraphicsItem ):
-    """
-    A simple QGraphicsItem that can be dragged around the scene.
-    Of course, this behavior is easier to achieve if you simply use the default 
-    event handler implementations in place and call 
-    QGraphicsItem.setFlags( QGraphicsItem.ItemIsMovable )
-    
-    ...but this example shows how to do it by hand, in case you want special behavior 
-    (e.g. only allowing left-right movement instead of arbitrary movement). 
-    """
     
     def __init__(self, *args, **kwargs):
         super( NodeBase, self ).__init__(*args, **kwargs )
         self.setAcceptHoverEvents(True)
         self.setFlags(self.flags() | QGraphicsItem.GraphicsItemFlag.ItemIsMovable | QGraphicsItem.GraphicsItemFlag.ItemIsSelectable | QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
         self.oldpos = self.scenePos().toPoint()
-        self.previewSocket = None
 
-        self.leftTerminals    : list[Socket] = []
-        self.rightTerminals   : list[Socket] = []
-        self.topTerminals     : list[Socket] = []
-        self.bottomTerminals  : list[Socket] = []
     
     def boundingRect(self):
         return QRectF( 0, 0, 100, 100)
@@ -60,12 +45,6 @@ class NodeBase( QGraphicsItem ):
         painter.fillPath(body, configuration.NodeBackground)
         painter.drawPath(body)
 
-        '''if not isinstance(self.previewpos, NoneType):
-            pen.setColor(QColor(255, 0, 0, 255))
-            pen.setWidth(6)
-            painter.setPen(pen)
-            painter.drawEllipse(self.previewpos, 5, 5)'''
-
         if self.isSelected():
             selectionoutline = QPainterPath()
             selectionoutline.addRoundedRect(self.boundingRect(), 10, 10)
@@ -77,40 +56,7 @@ class NodeBase( QGraphicsItem ):
     def hoverEnterEvent(self, event):
         cursor = QCursor( Qt.OpenHandCursor )
         QApplication.instance().setOverrideCursor( cursor )
-        
 
-    def hoverMoveEvent(self, event: QtWidgets.QGraphicsSceneHoverEvent) -> None:
-
-        bounds = self.boundingRect()
-        hpadding = bounds.width() * 0.2
-        vpadding = bounds.height() * 0.2
-
-        leftregion = QRectF(bounds.x(), bounds.y(), hpadding, bounds.height())
-        rightregion = QRectF(bounds.width() - hpadding, bounds.y(), hpadding, bounds.height())
-        topregion = QRectF(bounds.x(), bounds.y(), bounds.width(), vpadding)
-        botregion = QRectF(bounds.x(), bounds.height() - vpadding, bounds.width(), vpadding)
-
-        centertop = QPointF(bounds.width()/2, bounds.y())
-        centerleft = QPointF(bounds.x(), bounds.height()/2)
-        centerbot = QPointF(bounds.width()/2, bounds.height())
-        centerright = QPointF(bounds.width(), bounds.height()/2)
-
-        if leftregion.contains(event.pos()) or rightregion.contains(event.pos()) or topregion.contains(event.pos()) or botregion.contains(event.pos()):
-
-            closestpoint = closestPoint(event.pos(), [centerbot, centerleft, centerright, centertop])
-            self.update()
-            previewpos = closestpoint
-            
-            if leftregion.contains(previewpos):
-                pass
-            elif rightregion.contains(previewpos):
-                pass
-            elif topregion.contains(previewpos):
-                pass
-            elif botregion.contains(previewpos):
-                pass
-        #print(f'Top : {topregion.contains(event.pos())}\nBottom : {botregion.contains(event.pos())}\nLeft : {leftregion.contains(event.pos())}\nRight : {rightregion.contains(event.pos())}\nPreviewpos : {self.previewpos}')
-    
     def hoverLeaveEvent(self, event):
         QApplication.instance().restoreOverrideCursor()
         self.previewSocket = None
@@ -141,6 +87,89 @@ class NodeBase( QGraphicsItem ):
         objects.undoStack.push(NameEdit(self, self.lbl.namelabel.text()))
         self.blockname = self.lbl.namelabel.text()
 
+class DesignNode(NodeBase):
+
+    MINIMUMSOCKETPADDING = 10
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.previewSocket = None
+
+        self.leftTerminals    : list[Socket] = []
+        self.rightTerminals   : list[Socket] = []
+        self.topTerminals     : list[Socket] = []
+        self.bottomTerminals  : list[Socket] = []
+
+    def boundingRect(self):
+        
+        horizontalUnitSize = Socket.PILLSIZE.height() + DesignNode.MINIMUMSOCKETPADDING*2
+        verticalUnitSize = Socket.PILLSIZE.width() + DesignNode.MINIMUMSOCKETPADDING
+        # Calculate horizontal Terminal offsets
+        height = max(len(self.leftTerminals) , len(self.rightTerminals))* verticalUnitSize + 4*Socket.PILLSIZE.height()
+        # Calculate vertical terminal offsets
+        width = max(len(self.bottomTerminals) , len(self.topTerminals))* horizontalUnitSize + 4*Socket.PILLSIZE.width()
+
+        basesize = super().boundingRect()
+
+        return QRectF(0, 0, max(width, basesize.width()), max(height, basesize.height()))
+
+    def hoverMoveEvent(self, event: QtWidgets.QGraphicsSceneHoverEvent) -> None:
+
+        bounds = self.boundingRect()
+        hpadding = bounds.width() * 0.2
+        vpadding = bounds.height() * 0.2
+
+        leftregion = QRectF(bounds.x(), bounds.y(), hpadding, bounds.height())
+        rightregion = QRectF(bounds.width() - hpadding, bounds.y(), hpadding, bounds.height())
+        topregion = QRectF(bounds.x(), bounds.y(), bounds.width(), vpadding)
+        botregion = QRectF(bounds.x(), bounds.height() - vpadding, bounds.width(), vpadding)
+
+        centertop = QPointF(bounds.width()/2, bounds.y())
+        centerleft = QPointF(bounds.x(), bounds.height()/2)
+        centerbot = QPointF(bounds.width()/2, bounds.height())
+        centerright = QPointF(bounds.width(), bounds.height()/2)
+
+        if leftregion.contains(event.pos()) or rightregion.contains(event.pos()) or topregion.contains(event.pos()) or botregion.contains(event.pos()):
+
+            closestpoint = closestPoint(event.pos(), [centerbot, centerleft, centerright, centertop])
+
+            if leftregion.contains(closestpoint):
+                pass
+            elif rightregion.contains(closestpoint):
+                pass
+            elif topregion.contains(closestpoint):
+                pass
+            elif botregion.contains(closestpoint):
+                pass
+
+        self.update()
+    
+    def paint(self, painter, option, widget):
+        super().paint(painter, option, widget)
+        # Calculate horizontal Terminal offsets
+        horizontalUnitSize = Socket.PILLSIZE.height() + DesignNode.MINIMUMSOCKETPADDING*2
+        # Calculate vertical terminal offsets
+        verticalUnitSize = Socket.PILLSIZE.width() + DesignNode.MINIMUMSOCKETPADDING
+
+        centeringHPoint = self.boundingRect().height()/2
+        centeringVPoint = self.boundingRect().width()/2
+
+        leftOffset = centeringHPoint   - ((verticalUnitSize* len(self.leftTerminals))/2)
+        rightOffset = centeringHPoint  - ((verticalUnitSize* len(self.rightTerminals))/2)
+        topOffset = centeringVPoint    - ((horizontalUnitSize* len(self.topTerminals))/2)
+        bottomOffset = centeringVPoint - ((horizontalUnitSize* len(self.bottomTerminals))/2)
+
+        for count, socket in enumerate(self.leftTerminals):
+            socket.setPos(-Socket.PILLSIZE.width()/2, leftOffset+count*verticalUnitSize)
+
+        for count, socket in enumerate(self.rightTerminals):
+            socket.setPos(self.boundingRect().width()-Socket.PILLSIZE.width()/2, rightOffset+count*verticalUnitSize)
+
+        for count, socket in enumerate(self.topTerminals):
+            socket.setPos(topOffset+count*horizontalUnitSize, -Socket.PILLSIZE.height())
+
+        for count, socket in enumerate(self.bottomTerminals):
+            socket.setPos(bottomOffset+count*horizontalUnitSize, self.boundingRect().height()-Socket.PILLSIZE.height())
 
 class Socket(QGraphicsItem):
 
@@ -201,8 +230,14 @@ class Socket(QGraphicsItem):
             self.setSelected(True)
 
     def mouseReleaseEvent(self, event):
+        
         if not isinstance(self.__trace, NoneType):
             self.__trace.setZValue(0)
+        self.__trace.setZValue(-10)
+        if not isinstance(self.scene().itemAt(event.scenePos(), QTransform()), Socket):
+            self.scene().removeItem(self.__trace)
+            self.__trace = None
+        else: self.__trace.setZValue(10)
 
     def mouseMoveEvent(self, event: QtWidgets.QGraphicsSceneMouseEvent) -> None:
         if isinstance(self.__trace, NoneType):
@@ -214,97 +249,9 @@ class Socket(QGraphicsItem):
         self.__trace.prepareGeometryChange()
         self.__trace.myStartItem = event.pos()
 
-class DiagramViewer(QGraphicsView):
-
-    def __init__(self, scene : QGraphicsScene):
-        super(DiagramViewer, self).__init__(scene)
-        self._scene = scene
-        self.startPos = None
-        self.setAcceptDrops(True)
-        
-        self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
-        self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
-
-    ''' Item Focusing '''
-    def moveTo(self, pos : QPointF):
-        self.anim = QVariantAnimation()
-        self.anim.setDuration(500)
-        self.anim.setEasingCurve(QEasingCurve.InOutQuart)
-        self.anim.setStartValue(self.mapToScene(self.rect().center()))
-        self.anim.setEndValue(QPointF(pos.x(), pos.y()))
-        self.anim.valueChanged.connect(self._moveTick)
-        self.anim.start()
-
-    def _moveTick(self, pos):
-        self.centerOn(pos)
-
-    ''' Drag and Drop behavior '''
-    def dropEvent(self, event: QtGui.QDropEvent) -> None:
-        return super().dropEvent(event)
-
-    def dragEnterEvent(self, event: QtGui.QDragEnterEvent) -> None:
-        event.accept()
-        event.acceptProposedAction()
-        return super().dragEnterEvent(event)
-
-    def dragMoveEvent(self, event: QtGui.QDragMoveEvent) -> None:
-        event.accept()
-        return super().dragMoveEvent(event)
-
-    def contextMenuEvent(self, event) -> None:
-        pass
-
-    ''' Scroll behavior
-    Responsible for scaling when scrolling
-    '''
-    def wheelEvent(self, event : QWheelEvent, norep = False):
-        
-        if Qt.KeyboardModifier.ControlModifier == event.modifiers():
-
-            self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
-            if event.angleDelta().y() > 0:
-                self.scale(1.1, 1.1)
-            else:
-                self.scale(0.9, 0.9)
-        else:
-            super(DiagramViewer, self).wheelEvent(event)
-        self._scene.update()
-
-class DiagramScene(QGraphicsScene):
-
-    def __init__(self):
-        super().__init__()
-        
-        self._dragged= False
-        #self.setBackgroundBrush(configuration.GridColor)
-
-    def set_viewer(self, viewer):
-        self.viewer = viewer
-
-    def drawBackground(self, painter: QtGui.QPainter, rect: typing.Union[QtCore.QRectF, QtCore.QRect]) -> None:
-        left = int(rect.left()) - (int(rect.left()) % GRIDSIZE[0])
-        top = int(rect.top()) - (int(rect.top()) % GRIDSIZE[1])
-        painter.fillRect(rect, configuration.CanvasColor)
-        pen = painter.pen()
-        pen.setColor(configuration.GridColor)
-        painter.setPen(pen)
-
-        lines = []
-        for x in range(left, int(rect.right()), GRIDSIZE[0]):
-            lines.append(QLineF(x, rect.top(), x, rect.bottom()))
-        for y in range(top, int(rect.bottom()), GRIDSIZE[1]):
-            lines.append(QLineF(rect.left(), y, rect.right(), y))
-
-        painter.drawLines(lines)
-
-        return super().drawBackground(painter, rect)
-
-    ''' Mouse Interactions '''
-    def dragEnterEvent(self, QGraphicsSceneDragDropEvent):
-        QGraphicsSceneDragDropEvent.accept()
-
-    def dragMoveEvent(self, QGraphicsSceneDragDropEvent):
-        QGraphicsSceneDragDropEvent.accept()
+    def anchorPoint(self):
+        boundingrect = self.boundingRect()
+        return QPointF(self.scenePos().x() + (boundingrect.width() / 2), self.scenePos().y() - (boundingrect.height() / 2))
 
 class OldArrowItem(QGraphicsLineItem):
     ''' ArrowItem represents connections between items '''
