@@ -30,4 +30,4 @@ jobs:
     - name: Test with pytest
       run: |
         tree /F
-        pytest -n auto --disable-warnings -s -l -v -ra --tb=long
+        pytest -n auto --disable-warnings -s -l -v -ra --tb=long --full-trace
