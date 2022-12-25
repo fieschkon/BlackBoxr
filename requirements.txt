@@ -3,7 +3,7 @@ dictdiffer==0.9.0
 pip==22.0.4
 pytest==7.1.1
 
-# PySide6==6.4.1
-# PySide6-Addons==6.4.1
-# PySide6-Essentials==6.4.1
-# pyqtdarktheme==2.0.0
+PySide6==6.4.1
+PySide6-Addons==6.4.1
+PySide6-Essentials==6.4.1
+pyqtdarktheme==2.0.0
