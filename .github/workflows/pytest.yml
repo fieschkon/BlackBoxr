@@ -1,0 +1,32 @@
+name: Unit Tests
+
+on: [pull_request, workflow_dispatch]
+
+jobs:
+  test:
+
+    runs-on: windows-latest
+    strategy:
+      matrix:
+        python-version: ["3.10", "3.11"]
+
+    steps:
+    - name: Check out repo contents
+      uses: actions/checkout@v3
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v2
+      with:
+        python-version: ${{ matrix.python-version }}
+        architecture: "x86"
+    - name: Install dependencies
+      run: |
+        xcopy BlackBoxr Test/BlackBoxr /E
+        python -m pip install --upgrade pip
+        pip install pytest
+        pip install pytest-cov
+        pip install pytest-xdist
+        pip install -r BlackBoxr/requirements.txt
+    - name: Test with pytest
+      run: |
+        tree /F
+        pytest -n auto --disable-warnings -s -l -v -ra --tb=long
