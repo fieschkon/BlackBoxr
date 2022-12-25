@@ -156,3 +156,5 @@ ex.py
 
 # VSCode
 .vscode/
+.DS_Store
+*.pyc
