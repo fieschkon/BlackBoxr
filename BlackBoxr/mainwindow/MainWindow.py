@@ -220,6 +220,20 @@ class MainWindow(QWidget):
         self.db.leftTerminals += leftsockets
         self.db.topTerminals += topsockets
 
+        self.bading = DesignNode()
+        scene.addItem(self.bading)
+        self.bading.setPos(200, 100)
+
+        leftsockets = [Socket(self.bading) for x in range(2)]
+        rightsockets = [Socket(self.bading) for x in range(3)]
+        bottomsockets = [Socket(self.bading, vertical=True) for x in range(2)]
+        topsockets = [Socket(self.bading, vertical=True) for x in range(2)]
+
+        self.bading.rightTerminals += rightsockets
+        self.bading.bottomTerminals += bottomsockets
+        self.bading.leftTerminals += leftsockets
+        self.bading.topTerminals += topsockets
+
         self.setWindowTitle(objects.qapp.applicationName())
         self.label.setText(u"Ico")
         self.label_2.setText(objects.qapp.applicationName())

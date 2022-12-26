@@ -192,10 +192,10 @@ class DesignNode(NodeBase):
         centeringHPoint = self.boundingRect().height()/2
         centeringVPoint = self.boundingRect().width()/2
 
-        leftOffset = centeringHPoint   - ((verticalUnitSize* len(self.leftTerminals))/2)
-        rightOffset = centeringHPoint  - ((verticalUnitSize* len(self.rightTerminals))/2)
-        topOffset = centeringVPoint    - ((horizontalUnitSize* len(self.topTerminals))/2)
-        bottomOffset = centeringVPoint - ((horizontalUnitSize* len(self.bottomTerminals))/2)
+        leftOffset = centeringHPoint   - ((verticalUnitSize* len(self.leftTerminals))/2) + Socket.PILLSIZE.height()*2
+        rightOffset = centeringHPoint  - ((verticalUnitSize* len(self.rightTerminals))/2) + Socket.PILLSIZE.height()*2
+        topOffset = centeringVPoint    - ((horizontalUnitSize* len(self.topTerminals))/2) + Socket.PILLSIZE.width()/2
+        bottomOffset = centeringVPoint - ((horizontalUnitSize* len(self.bottomTerminals))/2) + Socket.PILLSIZE.width()/2
 
         for count, socket in enumerate(self.leftTerminals):
             socket.setPos(-Socket.PILLSIZE.width()/2, leftOffset+count*verticalUnitSize)
@@ -207,11 +207,11 @@ class DesignNode(NodeBase):
             socket.setPos(topOffset+count*horizontalUnitSize, -Socket.PILLSIZE.height())
 
         for count, socket in enumerate(self.bottomTerminals):
-            socket.setPos(bottomOffset+count*horizontalUnitSize, self.boundingRect().height()-Socket.PILLSIZE.height())
+            socket.setPos(bottomOffset+count*horizontalUnitSize, self.boundingRect().height()-Socket.PILLSIZE.height()*1.8) # 1.8 fudge factor?
 
 class Socket(QGraphicsItem):
 
-    PILLSIZE = QRectF( 0, 0, 20, 5)
+    PILLSIZE = QRectF( 0, 0, 25, 6)
 
     def __init__(self, parent, vertical = False, preview = False) -> None:
         
@@ -264,21 +264,22 @@ class Socket(QGraphicsItem):
                 socket.setSelected(True)
 
         else:
-
-            if objects.qapp.keyboardModifiers() == Qt.ControlModifier:
-                self.__trace = OldArrowItem(endItem=self.scene().selectedItems()[0], startItem=self, parent=None)
-                self.__trace.setZValue(0)
-                self.__trace.setPos(self.scenePos())
-                self.scene().addItem(self.__trace)
-                self.setSelected(False)
-            
-            elif objects.qapp.keyboardModifiers() == Qt.AltModifier:
-                self.scene().removeItem(self.__trace)
-                self.__trace = None
-            else:
-                for item in self.scene().selectedItems():
-                    item.setSelected(False)
-                self.setSelected(True)
+            try:
+                if objects.qapp.keyboardModifiers() == Qt.ControlModifier:
+                    self.__trace = ArrowItem(source=self.scene().selectedItems()[0], destination=self, parent=None)
+                    self.__trace.setZValue(0)
+                    self.__trace.setPos(self.scenePos())
+                    self.scene().addItem(self.__trace)
+                    self.setSelected(False)
+                
+                elif objects.qapp.keyboardModifiers() == Qt.AltModifier:
+                    self.scene().removeItem(self.__trace)
+                    self.__trace = None
+                else:
+                    for item in self.scene().selectedItems():
+                        item.setSelected(False)
+                    self.setSelected(True)
+            except IndexError: pass
 
     def mouseReleaseEvent(self, event):
         
@@ -287,18 +288,21 @@ class Socket(QGraphicsItem):
         if not isinstance(self.scene().itemAt(event.scenePos(), QTransform()), Socket) and not isinstance(self.__trace, NoneType):
             self.scene().removeItem(self.__trace)
             self.__trace = None
+        elif isinstance(self.scene().itemAt(event.scenePos(), QTransform()), Socket):
+            self.__trace._destinationPoint = self.scene().itemAt(event.scenePos(), QTransform())
         elif not isinstance(self.__trace, NoneType): 
             self.__trace.setZValue(10)
+        
 
     def mouseMoveEvent(self, event: QtWidgets.QGraphicsSceneMouseEvent) -> None:
         if isinstance(self.__trace, NoneType):
-            self.__trace = OldArrowItem(endItem=event.pos(), startItem=self, parent=None)
+            self.__trace = ArrowItem(source=event.pos(), destination=self, parent=None)
             self.__trace.setZValue(0)
             self.__trace.setPos(self.scenePos())
             self.scene().addItem(self.__trace)
             self.setSelected(False)
         self.__trace.prepareGeometryChange()
-        self.__trace.myStartItem = event.pos()
+        self.__trace._destinationPoint = event.pos()
 
     def anchorPoint(self):
         boundingrect = self.boundingRect()
@@ -434,3 +438,100 @@ class OldArrowItem(QGraphicsLineItem):
             pass
 
 
+class ArrowItem(QtWidgets.QGraphicsPathItem):
+    def __init__(self, source = None, destination = None, *args, **kwargs):
+        super(ArrowItem, self).__init__(*args, **kwargs)
+
+        self._sourcePoint = source
+        self._destinationPoint = destination
+
+        self._arrow_height = 5
+        self._arrow_width = 4
+
+    def setSource(self, point: QtCore.QPointF):
+        self._sourcePoint = point
+
+    def setDestination(self, point: QtCore.QPointF):
+        self._destinationPoint = point
+
+    def directPath(self):
+        
+        if isinstance(self._sourcePoint, QGraphicsItem):
+            s = self.mapFromParent(self._sourcePoint.scenePos())
+            
+        else:
+            s = self._sourcePoint
+        if isinstance(self._destinationPoint, QGraphicsItem):
+            d = self.mapFromParent(self._destinationPoint.scenePos())
+            
+        else:
+            d = self._destinationPoint
+
+        mid_x = s.x() + ((d.x() - s.x()) * 0.5)
+
+        path = QtGui.QPainterPath(QtCore.QPointF(s.x(), s.y()))
+        path.lineTo(mid_x, s.y())
+        path.lineTo(mid_x, d.y())
+        path.lineTo(d.x(), d.y())
+
+        return path
+
+    def arrowCalc(self, arrow_pos, start_point=None, end_point=None):  # calculates the point where the arrow should be drawn
+        if isinstance(self._sourcePoint, QGraphicsItem):
+            start_point = self.mapFromParent(self._sourcePoint.scenePos())
+        else:
+            start_point = self._sourcePoint
+        if isinstance(self._destinationPoint, QGraphicsItem):
+            end_point = self.mapFromParent(self._destinationPoint.scenePos())
+            
+        else:
+            end_point = self._destinationPoint
+        try:
+            startPoint, endPoint = start_point, end_point
+
+            if start_point is None:
+                startPoint = self._sourcePoint
+
+            if endPoint is None:
+                endPoint = self._destinationPoint
+
+            dx, dy = arrow_pos.x() - endPoint.x(), arrow_pos.y() - endPoint.y()
+
+            leng = math.sqrt(dx ** 2 + dy ** 2)
+            normX, normY = dx / leng, dy / leng  # normalize
+
+            # perpendicular vector
+            perpX = -normY
+            perpY = normX
+
+            leftX = endPoint.x() + self._arrow_height * normX + self._arrow_width * perpX
+            leftY = endPoint.y() + self._arrow_height * normY + self._arrow_width * perpY
+
+            rightX = endPoint.x() + self._arrow_height * normX - self._arrow_width * perpX
+            rightY = endPoint.y() + self._arrow_height * normY - self._arrow_width * perpY
+
+            point2 = QtCore.QPointF(leftX, leftY)
+            point3 = QtCore.QPointF(rightX, rightY)
+
+            return QtGui.QPolygonF([point2, endPoint, point3])
+
+        except (ZeroDivisionError, Exception):
+            return None
+
+    def paint(self, painter: QtGui.QPainter, option, widget=None) -> None:
+
+        painter.setRenderHint(QPainter.Antialiasing)
+
+        pen = painter.pen()
+        pen.setWidth(6)
+        painter.setPen(pen)
+        painter.setBrush(QtCore.Qt.NoBrush)
+
+        path = self.directPath()
+        painter.drawPath(path)
+        self.setPath(path)
+
+        triangle_source = self.arrowCalc(path.pointAtPercent(0.5))  # change path.PointAtPercent() value to move arrow on the line
+
+        if triangle_source is not None:
+            painter.drawPolyline(triangle_source)
