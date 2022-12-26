@@ -296,7 +296,7 @@ class Socket(QGraphicsItem):
 
     def mouseMoveEvent(self, event: QtWidgets.QGraphicsSceneMouseEvent) -> None:
         if isinstance(self.__trace, NoneType):
-            self.__trace = ArrowItem(source=event.pos(), destination=self, parent=None)
+            self.__trace = ArrowItem(source=self, destination=event.pos(), parent=None)
             self.__trace.setZValue(0)
             self.__trace.setPos(self.scenePos())
             self.scene().addItem(self.__trace)
