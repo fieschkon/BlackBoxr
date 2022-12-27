@@ -13,6 +13,7 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
 from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QLayout, QGridLayout, QListWidget, QListWidgetItem, QListView,
     QPushButton, QSizePolicy, QSpacerItem, QVBoxLayout, QLineEdit,
     QWidget, QTextEdit)
+from BlackBoxr import utilities
 from BlackBoxr.mainwindow.widgets import EditableLabel
 from BlackBoxr.misc import configuration, objects, Datatypes
 from BlackBoxr.misc.Datatypes import System
@@ -35,7 +36,7 @@ class SystemRepresenter(QWidget):
         updatedlabeltext = "{} seconds ago".format(timesince['seconds']) if timesince['seconds'] > 0 else updatedlabeltext
         updatedlabeltext = "{} minutes ago".format(timesince['minutes']) if timesince['minutes'] > 1 else updatedlabeltext
         updatedlabeltext = "{} hours ago".format(timesince['hours']) if timesince['hours'] > 1 else updatedlabeltext
-        updatedlabeltext = "{} days ago".format(timesince['days']) if timesince['days'] > 1 else updatedlabeltext
+        updatedlabeltext = "{} days ago".format(timesince['days']) if timesince['days'] > 0 else updatedlabeltext
 
 
         self.TypeLabel.setText(u"System")
@@ -146,7 +147,7 @@ class SystemRepresenter(QWidget):
         if file != False:
             sys = System.loadFromFile(file)
             sys.setName(text)
-            print(sys.save(file))
+            print(f'Saved system to {sys.save(file)}')
             del sys
         else:
             self.represented.save()
@@ -234,7 +235,17 @@ class Dashboard(QWidget):
         self.pushButton.setText(u"Create")
 
         self.pushButton.clicked.connect(lambda: self.addWidget(SystemRepresenter()))
-        self.gridlist.itemDoubleClicked.connect(lambda x : print(self.gridlist.itemWidget(x)))
+        self.gridlist.itemDoubleClicked.connect(self.systemOpened)
+
+    def systemOpened(self, sysrepper : SystemRepresenter):
+        
+        file = utilities.searchFilesForUUID(str(sysrepper.represented.uuid))
+        if file != False:
+            sys = System.loadFromFile(file)
+            if sys not in objects.systems:
+                objects.systems.append(sys)
+        else:
+            print(f"ERROR: Could not open system with uuid {str(sysrepper.represented.uuid)}")
         
 
 

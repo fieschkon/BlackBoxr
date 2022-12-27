@@ -9,11 +9,10 @@ from PySide6.QtWidgets import (
     QGraphicsItem, QGraphicsScene, QWidgetAction, QGraphicsRectItem, QGraphicsLineItem, QGraphicsPathItem, QGraphicsProxyWidget, QLabel, QApplication, QUndoView, QStatusBar
 )
 from PySide6 import QtCore, QtWidgets
-from PySide6.QtCore import Qt, QRectF, QRect, QPointF, QVariantAnimation, QEasingCurve, QLineF, QPoint
+from PySide6.QtCore import Qt, QRectF, QRect, QPointF, QVariantAnimation, QEasingCurve, QLineF, QPoint, Signal
 from PySide6 import QtGui
 from PySide6.QtGui import QTransform, QPixmap, QAction, QPainter, QColor, QPen, QBrush, QCursor, QPainterPath, QFont, QFontMetrics, QUndoStack, QKeySequence, QWheelEvent
 
-from BlackBoxr.mainwindow.widgets import Label
 from BlackBoxr.misc import configuration, objects
 from BlackBoxr.misc.Datatypes import MoveCommand, NameEdit
 from BlackBoxr.utilities import closestPoint
@@ -24,6 +23,8 @@ ENDOFFSET = -QPointF(25, 25)
 
 
 class DiagramViewer(QGraphicsView):
+
+    newVisibleArea = Signal(QRectF)
 
     def __init__(self, scene : QGraphicsScene):
         super(DiagramViewer, self).__init__(scene)
@@ -77,6 +78,7 @@ class DiagramViewer(QGraphicsView):
                 self.scale(0.9, 0.9)
         else:
             super(DiagramViewer, self).wheelEvent(event)
+        self.newVisibleArea.emit(self.mapToScene(self.viewport().geometry()).boundingRect())
         self._scene.update()
 
 class DiagramScene(QGraphicsScene):
@@ -93,9 +95,8 @@ class DiagramScene(QGraphicsScene):
     def drawBackground(self, painter: QtGui.QPainter, rect: typing.Union[QtCore.QRectF, QtCore.QRect]) -> None:
         left = int(rect.left()) - (int(rect.left()) % GRIDSIZE[0])
         top = int(rect.top()) - (int(rect.top()) % GRIDSIZE[1])
-        painter.fillRect(rect, configuration.CanvasColor)
         pen = painter.pen()
-        pen.setColor(configuration.GridColor)
+        pen.setColor(configuration.GridColor.color())
         painter.setPen(pen)
 
         lines = []
@@ -107,6 +108,18 @@ class DiagramScene(QGraphicsScene):
         painter.drawLines(lines)
 
         return super().drawBackground(painter, rect)
+
+    def searchByUUID(self, uuid : str):
+        db = self.items()
+        hit = None
+        for item in db:
+            if item.__class__ == 'Socket' and str(item.ownedDL.uuid) == uuid:
+                hit = item
+                break
+            elif iitem.__class__ == 'DesignNode' and str(item.ownedDL.uuid) == uuid:
+                hit = item
+                break
+        return hit
 
     ''' Mouse Interactions '''
     def dragEnterEvent(self, QGraphicsSceneDragDropEvent):

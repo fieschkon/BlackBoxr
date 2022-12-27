@@ -6,6 +6,7 @@ from PySide6.QtGui import QColor
 import qdarktheme
 from BlackBoxr import utilities
 from BlackBoxr.misc import objects
+from BlackBoxr.graphics.GUITypes import ThemedColor
 
 config = configparser.ConfigParser()
 
@@ -27,14 +28,15 @@ palette = qdarktheme.load_palette()
 namingstyle = u"By UUID"
 
 # Config Colors
-NodeBackground = QColor(9, 12, 9, 255)
+SocketColor = ThemedColor(QColor(255, 87, 51, 255), QColor(255, 255, 255, 255))
+NodeBackground = ThemedColor(QColor(211, 211, 211, 255) , QColor(9, 12, 9, 255))
 OperationHeader = QColor(139, 140, 139, 255)
 FunctionHeader = QColor(55, 95, 119, 255)
 ExecColor = QColor(255, 255, 255, 255)
 HeaderTextColor = QColor(255, 255, 255, 255)
 
 CanvasColor = QColor(33, 33, 33, 255)
-GridColor = QColor(47, 47, 47, 255)
+GridColor = ThemedColor(QColor(211, 211, 211, 255) , QColor(47, 47, 47, 255))
 
 SelectColor = QColor(255, 223, 100, 255)
 

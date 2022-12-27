@@ -14,9 +14,9 @@ from PySide6.QtCore import Qt, QRectF, QRect, QPointF, QVariantAnimation, QEasin
 from PySide6 import QtGui
 from PySide6.QtGui import QTransform, QPixmap, QAction, QPainter, QColor, QPen, QBrush, QCursor, QPainterPath, QFont, QFontMetrics, QUndoStack, QKeySequence, QWheelEvent
 
-from BlackBoxr.mainwindow.widgets import Label
+from BlackBoxr.mainwindow.widgets import DisplayItem, EditableLabel, ExpandableLineEdit, Label
 from BlackBoxr.misc import configuration, objects
-from BlackBoxr.misc.Datatypes import MoveCommand, NameEdit
+from BlackBoxr.misc.Datatypes import DesignElement, MoveCommand, NameEdit, RequirementElement
 from BlackBoxr.utilities import closestPoint
 
 GRIDSIZE = (25, 25)
@@ -43,7 +43,7 @@ class NodeBase( QGraphicsItem ):
         pen.setCapStyle(Qt.RoundCap)
         painter.setPen(pen)
         body.addRoundedRect(self.boundingRect(), 10, 10)
-        painter.fillPath(body, configuration.NodeBackground)
+        painter.fillPath(body, configuration.NodeBackground.color())
         painter.drawPath(body)
 
         if self.isSelected():
@@ -87,28 +87,53 @@ class NodeBase( QGraphicsItem ):
         objects.undoStack.push(NameEdit(self, self.lbl.namelabel.text()))
         self.blockname = self.lbl.namelabel.text()
 
+
+
 class DesignNode(NodeBase):
 
     MINIMUMSOCKETPADDING = 10
 
-    def __init__(self, *args, **kwargs):
+
+    def __init__(self, dl : DesignElement, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.previewSocket : Socket = Socket(None, False, 255/2)
+        self.previewSocket : Socket = Socket(None, None, False, 255/2)
         self.previewActive = False
+
+        self.ownedDL = dl
 
         self.leftTerminals    : list[Socket] = []
         self.rightTerminals   : list[Socket] = []
         self.topTerminals     : list[Socket] = []
         self.bottomTerminals  : list[Socket] = []
 
+        self.proxy = QGraphicsProxyWidget(self)
+        self.lbl = EditableLabel()
+        self.lbl.setText("DL")
+        self.proxy.setWidget(self.lbl)
+
+        #self.populate()
+
+    def populate(self):
+        # TODO
+        sys = self.ownedDL.owningSystem
+        self.lbl.setText(self.ownedDL.name)
+
+        for i in self.ownedDL.leftSockets:
+            pass
+        sys.searchByUUID()
+
+    def hookupConnections(self):
+        # TODO
+        self.scene().searchByUUID(str(self.ownedDL.uuid)) # For searching
+
     def boundingRect(self):
         
         horizontalUnitSize = Socket.PILLSIZE.height() + DesignNode.MINIMUMSOCKETPADDING*2
         verticalUnitSize = Socket.PILLSIZE.width() + DesignNode.MINIMUMSOCKETPADDING
         # Calculate horizontal Terminal offsets
-        height = max(len(self.leftTerminals) , len(self.rightTerminals))* verticalUnitSize + 4*Socket.PILLSIZE.height()
+        height = max(len(self.leftTerminals)+1 , (len(self.rightTerminals)+1))* verticalUnitSize + 4*Socket.PILLSIZE.height()
         # Calculate vertical terminal offsets
-        width = max(len(self.bottomTerminals) , len(self.topTerminals))* horizontalUnitSize + 4*Socket.PILLSIZE.width()
+        width = max(len(self.bottomTerminals)+1 , (len(self.topTerminals)+1))* horizontalUnitSize + 4*Socket.PILLSIZE.width()
 
         basesize = super().boundingRect()
 
@@ -135,9 +160,12 @@ class DesignNode(NodeBase):
 
     def materializePreview(self, pos):
         socketzone = self.determineClosestTerminalZone(pos)
-        sock = Socket(self, vertical=socketzone[1], preview=False)
-        socketzone[0].append(sock)
-        return sock
+        if socketzone != None:
+            dl = DesignElement(self.ownedDL.owningSystem)
+            sock = Socket(self, dl, vertical=socketzone[1], preview=False)
+            socketzone[0].append(sock)
+            return sock
+        else: return None
             
 
     def removePreviewSocket(self):
@@ -155,40 +183,42 @@ class DesignNode(NodeBase):
 
         leftregion = QRectF(bounds.x(), bounds.y(), hpadding, bounds.height())
         rightregion = QRectF(bounds.width() - hpadding, bounds.y(), hpadding, bounds.height())
-        topregion = QRectF(bounds.x(), bounds.y(), bounds.width(), vpadding)
-        botregion = QRectF(bounds.x(), bounds.height() - vpadding, bounds.width(), vpadding)
+        topregion = QRectF(hpadding, bounds.y(), bounds.width()*0.6, vpadding)
+        botregion = QRectF(hpadding, bounds.height() - vpadding, bounds.width()*0.6, vpadding)
 
         if leftregion.contains(inpos) or rightregion.contains(inpos) or topregion.contains(inpos) or botregion.contains(inpos):
-            centertop = QPointF(bounds.width()/2, bounds.y())
-            centerleft = QPointF(bounds.x(), bounds.height()/2)
-            centerbot = QPointF(bounds.width()/2, bounds.height())
-            centerright = QPointF(bounds.width(), bounds.height()/2)
-            closestpoint = closestPoint(inpos, [centerbot, centerleft, centerright, centertop])
             
             targetlist = None
             vertical = False
 
-            if leftregion.contains(closestpoint):
+            if leftregion.contains(inpos):
                 targetlist = self.leftTerminals
-            elif rightregion.contains(closestpoint):
+            elif rightregion.contains(inpos):
                 targetlist = self.rightTerminals
-            elif topregion.contains(closestpoint):
+            elif topregion.contains(inpos):
                 targetlist = self.topTerminals
                 vertical = True
-            elif botregion.contains(closestpoint):
+            elif botregion.contains(inpos):
                 targetlist = self.bottomTerminals
                 vertical = True
             return (targetlist, vertical)
         else:
             return None
 
-    def paint(self, painter, option, widget):
+
+    def paint(self, painter : QPainter, option, widget):
         super().paint(painter, option, widget)
         # Calculate horizontal Terminal offsets
         horizontalUnitSize = Socket.PILLSIZE.height() + DesignNode.MINIMUMSOCKETPADDING*2
         # Calculate vertical terminal offsets
         verticalUnitSize = Socket.PILLSIZE.width() + DesignNode.MINIMUMSOCKETPADDING
 
+        # Center Proxy
+        midpoint = QPointF(self.boundingRect().width()/2, self.boundingRect().height()/2)
+        offset = QPointF(self.proxy.boundingRect().width()/2, self.proxy.boundingRect().height()/2)
+        self.proxy.setPos(midpoint-offset)
+
+        # Arrange terminals
         centeringHPoint = self.boundingRect().height()/2
         centeringVPoint = self.boundingRect().width()/2
 
@@ -204,19 +234,45 @@ class DesignNode(NodeBase):
             socket.setPos(self.boundingRect().width()-Socket.PILLSIZE.width()/2, rightOffset+count*verticalUnitSize)
 
         for count, socket in enumerate(self.topTerminals):
-            socket.setPos(topOffset+count*horizontalUnitSize, -Socket.PILLSIZE.height())
+            socket.setPos(topOffset+count*horizontalUnitSize, -Socket.PILLSIZE.height()*1.8)
 
         for count, socket in enumerate(self.bottomTerminals):
             socket.setPos(bottomOffset+count*horizontalUnitSize, self.boundingRect().height()-Socket.PILLSIZE.height()*1.8) # 1.8 fudge factor?
+
+class RequirementNode(NodeBase):
+    def __init__(self, RL : RequirementElement, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.ownedRL = RL
+        self.proxy = QGraphicsProxyWidget(self)
+        self.lbl = DisplayItem(self.ownedRL)
+        self.proxy.setWidget(self.lbl)
+
+    def boundingRect(self):
+        proxysize = self.proxy.size()
+        return QRectF(0, 0, proxysize.width(), proxysize.height())
+
+
+class ExternalConnections(DesignNode):
+    def __init__(self, bbox, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.boundingbox = bbox
+
+    def boundingRect(self):
+        return QRectF(0, 0, self.boundingbox.width(), self.boundingbox.height())
+
+    def updatePos(self):
+        self.setPos(self.boundingbox.x(), self.boundingbox.y())
+        
 
 class Socket(QGraphicsItem):
 
     PILLSIZE = QRectF( 0, 0, 25, 6)
 
-    def __init__(self, parent, vertical = False, preview = False) -> None:
+    def __init__(self, parent, dl : DesignElement, vertical = False, preview = False) -> None:
         
         super( Socket, self ).__init__(parent=parent )
         self.parentNode = parent
+        self.ownedDL = dl
         self.__trace = None
         self.setZValue(100)
         self.traces = []
@@ -234,7 +290,9 @@ class Socket(QGraphicsItem):
         pen.setCapStyle(Qt.RoundCap)
         pen.setWidth(Socket.PILLSIZE.height())
         
-        pen.setColor(QColor(255, 255, 255, self.spriteOpacity))
+        socketcolor = configuration.SocketColor.color()
+        socketcolor.setAlpha(self.spriteOpacity)
+        pen.setColor(socketcolor)
         painter.setPen(pen)
         painter.drawRect(self.boundingRect())
 
@@ -282,16 +340,41 @@ class Socket(QGraphicsItem):
             except IndexError: pass
 
     def mouseReleaseEvent(self, event):
-        
-        if not isinstance(self.__trace, NoneType):
+        # Todo: cleanup
+
+        # Branch 1. Does trace exist and self is not preview
+            # Step 1. Move trace to back
+
+            # Branch 2. Determine if there is a socket at location that is not self and is not preview
+                # Step 1. Connect to socket
+                # Step 2. Bring trace to front
+            # Elif there is a DL at location
+                # Step 1. Determine which side was dropped
+                # Step 2. Materialize preview
+                # Step 3. Connect to socket
+                # Step 4. Bring trace to front
+            # Else:
+                # Step 1. Invalid drop placement, destroy trace
+        # Else:
+            # Pass
+
+        if self.__trace != None and not self.preview:
             self.__trace.setZValue(-10)
-        if not isinstance(self.scene().itemAt(event.scenePos(), QTransform()), Socket) and not isinstance(self.__trace, NoneType):
-            self.scene().removeItem(self.__trace)
-            self.__trace = None
-        elif isinstance(self.scene().itemAt(event.scenePos(), QTransform()), Socket):
-            self.__trace._destinationPoint = self.scene().itemAt(event.scenePos(), QTransform())
-        elif not isinstance(self.__trace, NoneType): 
-            self.__trace.setZValue(10)
+            item = self.scene().itemAt(event.scenePos(), QTransform())
+
+            if isinstance(item, Socket) and item != self and not item.preview:
+                self.__trace._destinationPoint = item
+                item.__trace = self.__trace
+                self.__trace.setZValue(10)
+            
+            elif isinstance(item, DesignNode):
+                socket = item.materializePreview(self.mapToItem(item, event.pos()))
+                self.__trace._destinationPoint = socket
+                socket.__trace = self.__trace
+                self.__trace.setZValue(10)
+            else:
+                self.scene().removeItem(self.__trace)
+                self.__trace = None
         
 
     def mouseMoveEvent(self, event: QtWidgets.QGraphicsSceneMouseEvent) -> None:
@@ -304,9 +387,9 @@ class Socket(QGraphicsItem):
         self.__trace.prepareGeometryChange()
         self.__trace._destinationPoint = event.pos()
 
-    def anchorPoint(self):
+    def anchorPoint(self) -> QPointF:
         boundingrect = self.boundingRect()
-        return QPointF(self.scenePos().x() + (boundingrect.width() / 2), self.scenePos().y() - (boundingrect.height() / 2))
+        return QPointF((boundingrect.width() / 2),(boundingrect.height() / 2))
 
 class OldArrowItem(QGraphicsLineItem):
     ''' ArrowItem represents connections between items '''
@@ -478,11 +561,11 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
 
     def arrowCalc(self, arrow_pos, start_point=None, end_point=None):  # calculates the point where the arrow should be drawn
         if isinstance(self._sourcePoint, QGraphicsItem):
-            start_point = self.mapFromParent(self._sourcePoint.scenePos())
+            start_point = self.mapFromParent(self._sourcePoint.scenePos()) - self._sourcePoint.anchorPoint()
         else:
             start_point = self._sourcePoint
         if isinstance(self._destinationPoint, QGraphicsItem):
-            end_point = self.mapFromParent(self._destinationPoint.scenePos())
+            end_point = self.mapFromParent(self._destinationPoint.scenePos()) + self._sourcePoint.anchorPoint()
             
         else:
             end_point = self._destinationPoint

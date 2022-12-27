@@ -8,18 +8,20 @@ from typing import Type
 from uuid import UUID, uuid4
 import uuid
 import warnings
+import qdarktheme
+from dictdiffer import diff, patch, swap, revert
 from PySide6.QtWidgets import (
     
     QGraphicsItem, QGraphicsScene
 )
-from PySide6.QtCore import QPointF
 from PySide6.QtGui import QUndoCommand
+from PySide6.QtCore import QPointF
 from datetime import datetime
 import json
 
 from BlackBoxr.utilities import first, getDuration
 from BlackBoxr.misc.objects import datadir, tmpdir, systems
-from BlackBoxr.misc import configuration 
+import BlackBoxr.misc.configuration as configuration
 
 class System():
     
@@ -126,6 +128,10 @@ class System():
 class Element():
 
     @staticmethod
+    def diff(elementA, elementB):
+        return list(diff(elementA.toDict(), elementB.toDict()))
+
+    @staticmethod
     def fromDict(inDict : dict, owningSystem : System = None):
         e = Element(owningSystem)
 
@@ -158,7 +164,7 @@ class Element():
         
         ''' Fields are used to denote public and private fields '''
         self.public = {}
-        self.private = {}
+        self.private = {'tags' : []}
 
         ''' Time tracking '''
         self.createDate = self.generateCreateTime()
@@ -210,39 +216,63 @@ class DesignElement(Element):
     def fromDict(inDict: dict, owningSystem: System = None):
         e = Element.fromDict(inDict, owningSystem)
         e.__class__ = DesignElement
-        e.connectionsTo     = inDict["connectionsTo"]  
-        e.connectionsFrom   = inDict["connectionsFrom"]
+        e.name = inDict["name"]  
+        e.topSockets     = inDict["topSockets"]  
+        e.bottomSockets   = inDict["bottomSockets"]
+        e.leftSockets     = inDict["leftSockets"]  
+        e.rightSockets   = inDict["rightSockets"]
         e.requirements  = inDict["requirements"]
+
+        e.connectionTo = inDict["connectionTo"]
+        e.connectionFrom = inDict["connectionFrom"]
+
         return copy.deepcopy(e)
 
     def __init__(self, owningSystem : System = None) -> None:
         super().__init__(owningSystem)
-        self.connectionsTo    : list[str] = []
-        self.connectionsFrom  : list[str] = []
+        self.name : str = ""
+
+        self.topSockets    : list[str] = []
+        self.bottomSockets  : list[str] = []
+        self.leftSockets    : list[str] = []
+        self.rightSockets  : list[str] = []
+
         self.requirements : list[str] = []
+        self.connectionTo : list[str] = []
+        self.connectionFrom : list[str] = []
+
+    def hasSockets(self)->bool:
+        return len(self.topSockets) == 0 and len(self.bottomSockets) == 0 and len(self.leftSockets) == 0 and len(self.rightSockets) == 0
 
     def addToSystem(self):
         self.owningSystem.DL.append(self)
 
     def toDict(self) -> dict:
         d = super().toDict()
-        d["connectionsTo"]   = self.connectionsTo
-        d["connectionsFrom"] = self.connectionsFrom
+        d["name"] = self.name
+        d["topSockets"]   = self.topSockets
+        d["bottomSockets"] = self.bottomSockets
+        d["leftSockets"]   = self.leftSockets
+        d["rightSockets"] = self.rightSockets
         d["requirements"] = self.requirements
+
+        d["connectionTo"] = self.connectionTo
+        d["connectionFrom"] = self.connectionFrom
 
         return copy.deepcopy(d)
 
     def addConnectionTo(self, targetDL):
-        if str(targetDL.uuid) not in self.connectionsTo:
-            self.connectionsTo.append(str(targetDL.uuid))
-        if str(self.uuid) not in targetDL.connectionsFrom:
-            targetDL.connectionsFrom.append(str(self.uuid))
+        if str(targetDL.uuid) not in self.connectionTo:
+            self.connectionTo.append(str(targetDL.uuid))
+        if str(self.uuid) not in targetDL.connectionFrom:
+            targetDL.connectionFrom.append(str(self.uuid))
 
     def addConnectionFrom(self, sourceDL):
-        if str(sourceDL.uuid) not in self.connectionsFrom:
-            self.connectionsFrom.append(str(sourceDL.uuid))
-        if str(self.uuid) not in sourceDL.connectionsTo:
-            sourceDL.connectionsTo.append(str(self.uuid))
+        if str(sourceDL.uuid) not in self.connectionFrom:
+            self.connectionFrom.append(str(sourceDL.uuid))
+        if str(self.uuid) not in sourceDL.connectionTo:
+            sourceDL.connectionTo.append(str(self.uuid))
+
 
 class RequirementElement(Element):
 
@@ -363,6 +393,8 @@ class NameEdit(QUndoCommand):
     def redo(self):
         self.node.blockname = self.newtext
         self.node.lbl.namelabel.setText(self.newtext)
+
+
 
 '''class ConnectionCommand(QUndoCommand):
     def __init__(self, scene, socketA, socketB):

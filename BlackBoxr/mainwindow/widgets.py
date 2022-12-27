@@ -1,13 +1,19 @@
+import copy
+from typing import Optional
 from PySide6.QtWidgets import (
-    QLabel, QWidget, QLineEdit, QDialog, QVBoxLayout, QScrollArea, QGridLayout, QComboBox, QDialogButtonBox, QSpacerItem, QSizePolicy
+    QLabel, QWidget,QTextEdit, QLineEdit, QDialog, QVBoxLayout, QScrollArea, QGridLayout, QComboBox, QDialogButtonBox, QSpacerItem, QSizePolicy, QHBoxLayout, QTreeWidget, QTreeWidgetItem, QAbstractItemView
 )
-from PySide6.QtGui import QFont, QFontMetrics
+from PySide6.QtGui import QFont, QFontMetrics, QTextCursor, QPainter, QPen, QPainterPath, QRegion
 from PySide6.QtCore import Signal, Slot, QRect, QSize, Qt
 from PySide6 import QtCore, QtGui, QtWidgets
+from BlackBoxr import utilities
+from BlackBoxr.graphics.viewer import DiagramScene, DiagramViewer
 
-from BlackBoxr.misc import configuration
-
+from BlackBoxr.misc import configuration, objects
+from PySide6.QtCharts import QChart, QChartView, QPieSeries
 import qdarktheme
+
+from BlackBoxr.misc.Datatypes import DesignElement, Element, System
 
 bold = QFont("Verdana", 16)
 bold.setBold(True)
@@ -459,18 +465,57 @@ class LineEdit(QLineEdit):
         self.editingFinished.emit()
         return super().focusOutEvent(arg__1)
 
+class TextEdit(QTextEdit):
+    """
+    A TextEdit editor that sends editingFinished events 
+    when the text was changed and focus is lost.
+    """
+
+    editingFinished = QtCore.Signal()
+    receivedFocus = QtCore.Signal()
+    
+    def __init__(self, parent):
+        super(TextEdit, self).__init__(parent)
+        self._changed = False
+        self.setTabChangesFocus( True )
+        self.textChanged.connect( self._handle_text_changed )
+
+    def focusInEvent(self, event):
+        super(TextEdit, self).focusInEvent( event )
+        self.receivedFocus.emit()
+
+    def focusOutEvent(self, event):
+        if self._changed:
+            self.editingFinished.emit()
+        super(TextEdit, self).focusOutEvent( event )
+
+    @QtCore.Slot()
+    def _handle_text_changed(self):
+        self._changed = True
+
+    def setTextChanged(self, state=True):
+        self._changed = state
+
+    def setHtml(self, html):
+        QtGui.QTextEdit.setHtml(self, html)
+        self._changed = False
+
 class KeyPressHandler(QtCore.QObject):
     """Custom key press handler"""
     escapePressed = QtCore.Signal(bool)
     returnPressed = QtCore.Signal(bool)
+    shiftReturnPressed = QtCore.Signal(bool)
 
     def eventFilter(self, obj, event):
         if event.type() == QtCore.QEvent.KeyPress:
             event_key = event.key()
-            if event_key == QtCore.Qt.Key_Escape:
+            if event_key == QtCore.Qt.Key.Key_Escape:
                 self.escapePressed.emit(True)
                 return True
-            if event_key == QtCore.Qt.Key_Return or event_key == QtCore.Qt.Key_Enter:
+            if event_key == QtCore.Qt.Key.Key_Return or event_key == QtCore.Qt.Key.Key_Enter and event_key == QtCore.Qt.Key.Key_Control:
+                self.shiftReturnPressed.emit(True)
+                return True
+            if event_key == QtCore.Qt.Key.Key_Return or event_key == QtCore.Qt.Key.Key_Enter:
                 self.returnPressed.emit(True)
                 return True
 
@@ -481,7 +526,7 @@ class EditableLabel(QWidget):
     textChanged = QtCore.Signal(str)
     def __init__(self, parent=None, **kwargs):
         QWidget.__init__(self, parent=parent)
-
+        
         self.is_editable = kwargs.get("editable", True)
         self.keyPressHandler = KeyPressHandler(self)
 
@@ -491,6 +536,8 @@ class EditableLabel(QWidget):
         
         self.label = QtWidgets.QLabel(self)
         self.label.setObjectName("label")
+        self.label.setAutoFillBackground(False)
+        self.label.setStyleSheet("background-color: rgba(255, 255, 255, 0);")
         self.mainLayout.addWidget(self.label)
         self.lineEdit = LineEdit(self)
         self.lineEdit.setObjectName("lineEdit")
@@ -710,3 +757,241 @@ class GlobalSettingsDialog(QDialog):
     def closeEvent(self, arg__1) -> None:
         self.saveSettings()
         return super().closeEvent(arg__1)
+
+class PieChart(QWidget):
+
+    def __init__(self):
+        super().__init__()
+
+        self.series = QPieSeries()
+
+        self.series.append('Jane', 1)
+        self.series.append('Joe', 2)
+        self.series.append('Andy', 3)
+        self.series.append('Barbara', 4)
+        self.series.append('Axel', 5)
+
+        self.slice = self.series.slices()[1]
+        self.slice.setExploded()
+        self.slice.setLabelVisible()
+        self.slice.setPen(QPen(Qt.darkGreen, 2))
+        self.slice.setBrush(Qt.green)
+
+        self.chart = QChart()
+        self.chart.addSeries(self.series)
+        self.chart.setTitle('Simple piechart example')
+        self.chart.legend().hide()
+
+        self._chart_view = QChartView(self.chart)
+        self._chart_view.setRenderHint(QPainter.Antialiasing)
+
+
+class ExpandableLineEdit(QWidget):
+    textChanged = QtCore.Signal(str)
+    textCommitted = QtCore.Signal(str)
+
+    def __init__(self, parent: Optional[QtWidgets.QWidget]) -> None:
+        super().__init__(parent)
+        self.mainLayout = QtWidgets.QHBoxLayout(self)
+        self.mainLayout.setContentsMargins(0, 0, 0, 0)
+        self.mainLayout.setObjectName("mainLayout")
+
+        self.lineEdit = LineEdit(self)
+        self.lineEdit.setObjectName("lineEdit")
+        self.mainLayout.addWidget(self.lineEdit)
+
+        self.textEdit = TextEdit(self)
+        self.textEdit.setObjectName("textEdit")
+        self.mainLayout.addWidget(self.textEdit)
+        self.textEdit.setHidden(True)
+
+        self.setupSignals()
+
+    def text(self) -> str:
+        self.unifyText()
+        return self.lineEdit.text()
+
+    def setText(self, text):
+        self.lineEdit.setText(text)
+        self.textEdit.setText(text)
+
+    def setupSignals(self):
+        self.lineEdit.editingFinished.connect(self.returnPressed)
+        self.textEdit.editingFinished.connect(self.returnPressed)
+        self.lineEdit.textChanged.connect(self.edited)
+        self.textEdit.textChanged.connect(self.edited)
+
+    def returnPressed(self):
+        self.unifyText()
+        self.textCommitted.emit(self.lineEdit.text())
+
+    def edited(self):
+        try:
+            self.evaluate()
+            self.textChanged.emit(self.lineEdit.text())
+        except RecursionError: pass
+
+    def unifyText(self):
+        if self.lineEdit.isHidden():
+            self.lineEdit.setText(self.textEdit.toPlainText())
+        else:
+            self.textEdit.setText(self.lineEdit.text())
+        
+    def evaluate(self):
+        shouldHide = self.getTextWidth() >= self.lineEdit.width()
+        self.unifyText()
+        self.lineEdit.setHidden(shouldHide)
+        self.textEdit.setHidden(not shouldHide)
+        self.lineEdit.blockSignals(shouldHide)
+        self.textEdit.blockSignals(not shouldHide)
+        if shouldHide:
+            if self.lineEdit.hasFocus():
+                self.textEdit.setFocus(Qt.FocusReason.OtherFocusReason)
+                cursor = QTextCursor(self.textEdit.document())
+                cursor.movePosition(QTextCursor.MoveOperation.End)
+                self.textEdit.setTextCursor(cursor)
+        else:
+            if self.textEdit.hasFocus():
+                self.lineEdit.setFocus(Qt.FocusReason.OtherFocusReason)
+
+        
+
+    def getTextWidth(self) -> int:
+        return QFontMetrics(self.font()).horizontalAdvance(self.lineEdit.text())
+
+class GenericCanvasView(QWidget):
+
+    def __init__(self, source : System, parent: Optional[QtWidgets.QWidget]) -> None:
+        super().__init__(parent)
+        self.setupUI()
+        self.source = source
+
+    def setupUI(self):
+        self.horizontalLayout = QHBoxLayout(self)
+        self.horizontalLayout.setObjectName(u"horizontalLayout")
+        self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
+        self.ElementTree = QTreeWidget(self)
+        __qtreewidgetitem = QTreeWidgetItem()
+        __qtreewidgetitem.setText(0, u"Available Elements")
+        self.ElementTree.setHeaderItem(__qtreewidgetitem)
+        self.ElementTree.setObjectName(u"ElementTree")
+        sizePolicy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.ElementTree.sizePolicy().hasHeightForWidth())
+        self.ElementTree.setSizePolicy(sizePolicy)
+        self.ElementTree.setDragDropMode(QAbstractItemView.InternalMove)
+        self.ElementTree.setSelectionMode(QTreeWidget.SelectionMode.ContiguousSelection)
+        self.ElementTree.setSortingEnabled(True)
+        self.ElementTree.setHeaderHidden(False)
+        self.ElementTree.header().setProperty("showSortIndicator", True)
+
+        self.horizontalLayout.addWidget(self.ElementTree)
+
+        self.Scene = DiagramScene()
+        self.Viewer = DiagramViewer(self.Scene)
+        self.Viewer.setObjectName(u"Viewer")
+
+        self.horizontalLayout.addWidget(self.Viewer)
+
+class DesignView(GenericCanvasView):
+
+    def __init__(self, source, parent: Optional[QtWidgets.QWidget]) -> None:
+        super().__init__(source, parent)
+        self.Scene.setSceneRect(0,0,50000,50000)
+        self.Viewer.centerOn(25000, 25000)
+        self.populateTree()
+
+        self.Viewer.newVisibleArea.connect(self.onViewportResize)
+
+
+    def onViewportResize(self, rect):
+        pass
+        '''self.externalConnectors.boundingbox = rect
+        self.externalConnectors.updatePos()'''
+
+    def populateTree(self):
+        self.ElementTree.clear()
+        self.toplevelDLs = QTreeWidgetItem(self.ElementTree)
+        self.toplevelDLs.setText(0, "Design Elements")
+        self.toplevelSystems = QTreeWidgetItem(self.ElementTree)
+        self.toplevelSystems.setText(0, "Available Systems")
+        self.ElementTree.addTopLevelItem(self.toplevelDLs)
+        self.ElementTree.addTopLevelItem(self.toplevelSystems)
+
+        # Populate Systems
+        for system in objects.systems:
+            system : System
+            self.toplevelDLs = QTreeWidgetItem(self.toplevelSystems)
+            self.toplevelDLs.setText(0, system.name)
+                
+class DisplayItem(QWidget):
+    def __init__(self, item : Element, parent: Optional[QtWidgets.QWidget] = None) -> None:
+        super().__init__(parent)
+        self.resize(380, 480)
+        self.ownedItem = item
+        self.fieldAreas : list[ExpandableLineEdit] = []
+        self.setupUI()
+        self.createFields()
+
+        # Rounded corners
+        path = QPainterPath()
+        path.addRoundedRect(0, 0, self.size().width(), self.size().height(), 10, 10)
+        mask = QRegion(path.toFillPolygon().toPolygon())
+        self.setMask(mask)
+
+    def setupUI(self):
+
+        self.verticallayout = QVBoxLayout(self)
+
+        self.idLabel = QLabel(str(self.ownedItem.uuid), self)
+
+        self.verticallayout.addWidget(self.idLabel)
+
+        self.scrollArea = QScrollArea(self)
+        self.scrollArea.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        self.scrollArea.setWidgetResizable(True)
+        self.scrollAreaContents = QtWidgets.QWidget()
+        self.scrollAreaContents.setGeometry(QtCore.QRect(0, 0, 380, 480))
+        self.scrollArea.setWidget(self.scrollAreaContents)
+        self.verticallayout.addWidget(self.scrollArea)
+        
+        self.mainLayout = QVBoxLayout(self.scrollAreaContents)
+        self.scrollAreaContents.setLayout(self.mainLayout)
+        
+
+    def createFields(self):
+        for i, (key, value) in enumerate(self.ownedItem.public.items()):
+            self.fieldAreas.append(FieldWidget(key, self.scrollAreaContents))
+            self.fieldAreas[-1].setText(value)
+            self.fieldAreas[-1].edited.connect(lambda title, content : self.itemChanged(title, content))
+            self.mainLayout.addWidget(self.fieldAreas[-1])
+
+
+    def itemChanged(self, key, value):
+        prevpublic = copy.deepcopy(self.ownedItem.public)
+        self.ownedItem.public[key] = value
+        print(utilities.diffdict(prevpublic, self.ownedItem.public))
+
+class FieldWidget(QWidget):
+
+    edited = Signal(str, str)
+
+    def __init__(self, title, parent: Optional[QtWidgets.QWidget]) -> None:
+        super().__init__(parent)
+        self.title = title
+        self.mainLayout = QVBoxLayout(self)
+        self.setLayout(self.mainLayout)
+
+        self.mainLayout.addWidget(QLabel(title, self))
+        self.textfield = ExpandableLineEdit(self)
+        self.mainLayout.addWidget(self.textfield)
+
+        self.textfield.textCommitted.connect(lambda x: self.edited.emit(title, x))
+        
+
+    def setText(self, text : str):
+        self.textfield.setText(text)
+
+    def text(self):
+        return self.textfield.text()

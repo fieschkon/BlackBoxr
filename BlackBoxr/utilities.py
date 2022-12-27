@@ -2,7 +2,12 @@
 from datetime import datetime
 import logging
 import os
+import platform
+import random
+import string
+import subprocess
 from PySide6.QtCore import QPointF
+from dictdiffer import diff, patch, swap, revert
 
 
 def first(iterable, default=None):
@@ -90,3 +95,37 @@ def closestPoint(pointtosearch : QPointF, points : list[QPointF]):
           closest_point = point
           closest_dist = distance
   return closest_point
+
+def getTheme():
+  match platform.system():
+    case 'Darwin':
+      cmd = 'defaults read -g AppleInterfaceStyle'
+      p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, shell=True)
+      return 'dark' if bool(p.communicate()[0]) else 'light'
+    case 'Windows':
+      try:
+          import winreg
+      except ImportError:
+          return 'light'
+      registry = winreg.ConnectRegistry(None, winreg.HKEY_CURRENT_USER)
+      reg_keypath = r'SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+      try:
+          reg_key = winreg.OpenKey(registry, reg_keypath)
+      except FileNotFoundError:
+          return 'light'
+
+      for i in range(1024):
+          try:
+              value_name, value, _ = winreg.EnumValue(reg_key, i)
+              if value_name == 'AppsUseLightTheme':
+                  return 'dark' if value == 0 else 'light'
+          except OSError:
+              break
+      return 'light'
+
+def randomString(length=5)->str:
+  return ''.join(random.choices(string.ascii_letters, k=length))
+
+def diffdict(dictA : dict, dictB : dict):
+  return list(diff(dictA, dictB))

@@ -5,10 +5,14 @@ import os
 import random
 import pytest
 from time import sleep
+from BlackBoxr import utilities
 from BlackBoxr.misc import Datatypes
 from BlackBoxr.misc.Datatypes import DesignElement, Element, RequirementElement, System, TestElement
+from BlackBoxr.graphics.GUITypes import ThemedColor
 from BlackBoxr.misc.objects import datadir, tmpdir
+from BlackBoxr.misc import configuration
 from dictdiffer import diff, patch, swap, revert
+from PySide6.QtGui import QColor
 
 testSys = System()
 
@@ -162,3 +166,18 @@ class TestSerialization:
 
         for i in skaboop:
             os.remove(i)
+
+class TestColors:
+    def test_AutoDetect(self):
+        color = ThemedColor(QColor(255, 0, 0, 255), QColor(0, 255, 0, 255))
+
+        # Configuration uses dark
+        configuration.themename = 'dark'
+        assert color.color() == QColor(0, 255, 0 ,255)
+        # Light
+        configuration.themename = 'light'
+        assert color.color() == QColor(255, 0, 0 ,255)
+        # Auto
+        configuration.themename = 'auto'
+        testcolor = QColor(0, 255, 0 ,255) if utilities.getTheme() == 'dark' else QColor(255, 0, 0 ,255)
+        assert color.color() == testcolor
