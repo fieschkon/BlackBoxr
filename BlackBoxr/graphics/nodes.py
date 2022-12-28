@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QGraphicsItem, QGraphicsScene, QWidgetAction, QGraphicsRectItem, QGraphicsLineItem, QGraphicsPathItem, QGraphicsProxyWidget, QLabel, QApplication, QUndoView, QStatusBar
 )
 from PySide6 import QtCore, QtWidgets
-from PySide6.QtCore import Qt, QRectF, QRect, QPointF, QVariantAnimation, QEasingCurve, QLineF, QPoint, QRunnable, Signal, QThreadPool, QObject
+from PySide6.QtCore import Qt, QRectF, QRect, QPointF, QVariantAnimation, QEasingCurve, QLineF, QPoint, QRunnable, Signal, QThreadPool, QObject, Slot
 from PySide6 import QtGui
 from PySide6.QtGui import QTransform, QPixmap, QAction, QPainter, QColor, QPen, QBrush, QCursor, QPainterPath, QFont, QFontMetrics, QUndoStack, QKeySequence, QWheelEvent
 
@@ -280,10 +280,10 @@ class RequirementNode(NodeBase):
         super().paint(painter, option, widget)
         bbox = self.boundingRect()
         # (self.boundingRect().width()/2)-(Socket.PILLSIZE.width()/2)
-        self.topSocket.setPos(
-            (bbox.width()/2)-(Socket.PILLSIZE.width()/2), bbox.height())
         self.bottomSocket.setPos(
-            (bbox.width()/2)-(Socket.PILLSIZE.width()/2), 0)
+            (bbox.width()/2)-(Socket.PILLSIZE.width()/2), bbox.height())
+        self.topSocket.setPos(
+            (bbox.width()/2)-(Socket.PILLSIZE.width()/2), -Socket.PILLSIZE.width())
 
 
 class ExternalConnections(DesignNode):
@@ -575,6 +575,7 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
         self.moved = True
         self.nodePath = []
         self.worker = None
+        self.threadpool = QThreadPool()
 
     def setSource(self, point: QtCore.QPointF):
         self._sourcePoint = point
@@ -625,7 +626,6 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
         return path
 
     def updatePath(self, nodes):
-        print("Running")
         self.nodePath = nodes
 
     # calculates the point where the arrow should be drawn
@@ -759,5 +759,4 @@ def pathfind(a: QPointF, b: QPointF, scene: QGraphicsScene, view: QGraphicsView,
              coordinate[1]*GRIDSIZE[1]+gridOffset[1]+searchbounds.y()+Socket.PILLSIZE.height())
         translatedpath.append(p)
     return translatedpath
-
 
