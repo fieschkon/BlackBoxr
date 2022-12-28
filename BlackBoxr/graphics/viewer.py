@@ -15,12 +15,14 @@ from PySide6.QtGui import QTransform, QPixmap, QAction, QPainter, QColor, QPen, 
 
 from BlackBoxr.misc import configuration, objects
 from BlackBoxr.misc.Datatypes import MoveCommand, NameEdit
-from BlackBoxr.utilities import closestPoint
+from BlackBoxr.utilities import closestPoint, printMatrix
+
+from pathfinding.core.diagonal_movement import DiagonalMovement
+from pathfinding.core.grid import Grid
+from pathfinding.finder.a_star import AStarFinder
 
 GRIDSIZE = (25, 25)
 ENDOFFSET = -QPointF(25, 25)
-
-
 
 class DiagramViewer(QGraphicsView):
 
@@ -116,7 +118,7 @@ class DiagramScene(QGraphicsScene):
             if item.__class__ == 'Socket' and str(item.ownedDL.uuid) == uuid:
                 hit = item
                 break
-            elif iitem.__class__ == 'DesignNode' and str(item.ownedDL.uuid) == uuid:
+            elif item.__class__ == 'DesignNode' and str(item.ownedDL.uuid) == uuid:
                 hit = item
                 break
         return hit
@@ -127,4 +129,54 @@ class DiagramScene(QGraphicsScene):
 
     def dragMoveEvent(self, QGraphicsSceneDragDropEvent):
         QGraphicsSceneDragDropEvent.accept()
+
+
+
+def pathfind(a : QPointF, b : QPointF, scene : QGraphicsScene, ignoreditems : list[QGraphicsItem]):
+
+    topleft = QPointF(min(a.x(), b.x()), min(a.y(), b.y()))
+    bottomright = QPointF(max(a.x(), b.x()), max(a.y(), b.y()))
+    searchbounds = QRectF(topleft, bottomright)
+    
+    mat = [[1 for _ in range(math.ceil(searchbounds.width() / GRIDSIZE[0]))] for _ in range(math.ceil(searchbounds.height() / GRIDSIZE[1]))]
+    for c2 in range(len(mat)):
+        for c1 in range(len(mat[0])):
+            x = searchbounds.x() + (GRIDSIZE[0] * c1)
+            y = searchbounds.y() + (GRIDSIZE[0] * c2)
+            
+            t = scene.itemAt(QPointF(float(x), float(y)), QTransform())
+            mat[c2][c1] = -1 if isinstance(t, NodeBase) and t not in ignoreditems else 1
+    
+    grid = Grid(matrix=mat)
+
+    if a.x() < b.x() and a.y() < b.y():
+
+        start = grid.node(0, 0)
+        end = grid.node(len(mat[0])-1, len(mat)-1)
+        anchor = a
+
+    elif a.x() < b.x() and a.y() > b.y():
+
+        start = grid.node(0, len(mat)-1)
+        end = grid.node(len(mat[0])-1, 0)
+        anchor = a - QPointF(len(mat[0])-1, 0)
+
+    elif a.x() > b.x() and a.y() < b.y():
+
+        start = grid.node(len(mat[0])-1, 0)
+        end = grid.node(0, len(mat)-1)
+        anchor = a - QPointF((len(mat[0])-1) * GRIDSIZE[0], 0)
+
+    elif a.x() > b.x() and a.y() > b.y():
+
+        start = grid.node(len(mat[0])-1, len(mat)-1)
+        end = grid.node(0, 0)
+        anchor = a - QPointF(0, 0)
+
+    finder = AStarFinder(diagonal_movement=DiagonalMovement.always)
+    path, runs = finder.find_path(start, end, grid)
+    translatedpath = []
+    printMatrix(mat)
+
+    return translatedpath, anchor
 

@@ -129,3 +129,10 @@ def randomString(length=5)->str:
 
 def diffdict(dictA : dict, dictB : dict):
   return list(diff(dictA, dictB))
+
+def printMatrix(mat : list[list]):
+  for row in mat:
+    print(row)
+
+def snapToGrid(val, base):
+    return base * round(val/base)

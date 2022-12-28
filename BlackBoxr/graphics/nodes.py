@@ -17,8 +17,10 @@ from PySide6.QtGui import QTransform, QPixmap, QAction, QPainter, QColor, QPen, 
 from BlackBoxr.mainwindow.widgets import DisplayItem, EditableLabel, ExpandableLineEdit, Label
 from BlackBoxr.misc import configuration, objects
 from BlackBoxr.misc.Datatypes import DesignElement, MoveCommand, NameEdit, RequirementElement
-from BlackBoxr.utilities import closestPoint
-
+from BlackBoxr.utilities import closestPoint, printMatrix, snapToGrid
+from pathfinding.core.diagonal_movement import DiagonalMovement
+from pathfinding.core.grid import Grid
+from pathfinding.finder.a_star import AStarFinder
 GRIDSIZE = (25, 25)
 ENDOFFSET = -QPointF(25, 25)
 
@@ -86,8 +88,6 @@ class NodeBase( QGraphicsItem ):
     def renamed(self):
         objects.undoStack.push(NameEdit(self, self.lbl.namelabel.text()))
         self.blockname = self.lbl.namelabel.text()
-
-
 
 class DesignNode(NodeBase):
 
@@ -247,9 +247,19 @@ class RequirementNode(NodeBase):
         self.lbl = DisplayItem(self.ownedRL)
         self.proxy.setWidget(self.lbl)
 
+        self.topSocket = Socket(self, None, vertical=True)
+        self.bottomSocket = Socket(self, None, vertical=True)
+
     def boundingRect(self):
         proxysize = self.proxy.size()
         return QRectF(0, 0, proxysize.width(), proxysize.height())
+
+    def paint(self, painter, option, widget):
+        super().paint(painter, option, widget)
+        bbox = self.boundingRect()
+        #(self.boundingRect().width()/2)-(Socket.PILLSIZE.width()/2)
+        self.topSocket.setPos((bbox.width()/2)-(Socket.PILLSIZE.width()/2), bbox.height())
+        self.bottomSocket.setPos((bbox.width()/2)-(Socket.PILLSIZE.width()/2), 0)
 
 
 class ExternalConnections(DesignNode):
@@ -538,24 +548,34 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
         self._destinationPoint = point
 
     def directPath(self):
-        
+        ignoreditems = []
         if isinstance(self._sourcePoint, QGraphicsItem):
             s = self.mapFromParent(self._sourcePoint.scenePos())
-            
+            ignoreditems.append(self._sourcePoint)
         else:
             s = self._sourcePoint
         if isinstance(self._destinationPoint, QGraphicsItem):
             d = self.mapFromParent(self._destinationPoint.scenePos())
+            ignoreditems.append(self._destinationPoint)
             
         else:
             d = self._destinationPoint
 
-        mid_x = s.x() + ((d.x() - s.x()) * 0.5)
+        s.setY(s.y()+Socket.PILLSIZE.width())
 
-        path = QtGui.QPainterPath(QtCore.QPointF(s.x(), s.y()))
+        mid_x = s.x() + ((d.x() - s.x()) * 0.2)
+        
+        efficientpath, anchor = pathfind(self.mapToScene(s), self.mapToScene(d), self.scene(), [])
+        path = QtGui.QPainterPath(s)
+
+        for coord in efficientpath:
+            path.lineTo(QPointF(coord[0], coord[1])+anchor)
+        path.lineTo(d)
+
+        '''path = QtGui.QPainterPath(QtCore.QPointF(s.x(), s.y()))
         path.lineTo(mid_x, s.y())
         path.lineTo(mid_x, d.y())
-        path.lineTo(d.x(), d.y())
+        path.lineTo(d.x(), d.y())'''
 
         return path
 
@@ -618,3 +638,61 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
 
         if triangle_source is not None:
             painter.drawPolyline(triangle_source)
+
+def pathfind(a : QPointF, b : QPointF, scene : QGraphicsScene, ignoreditems : list[QGraphicsItem]):
+
+    topleft = QPointF(min(a.x(), b.x()), min(a.y(), b.y()))
+    bottomright = QPointF(max(a.x(), b.x()), max(a.y(), b.y()))
+    searchbounds = QRectF(topleft, bottomright)
+    
+    mat = [[1 for _ in range(math.ceil(searchbounds.width() / GRIDSIZE[0]))] for _ in range(math.ceil(searchbounds.height() / GRIDSIZE[1]))]
+    for c2 in range(len(mat)):
+        for c1 in range(len(mat[0])):
+            x = searchbounds.x() + (GRIDSIZE[0] * c1)
+            y = searchbounds.y() + (GRIDSIZE[0] * c2)
+            t = scene.itemAt(QPointF(float(x), float(y)), QTransform())
+            items = scene.items(QPointF(float(x), float(y)))
+            types = [type(item) for item in items]
+            if QGraphicsProxyWidget in types:
+                mat[c2][c1] = -1
+            else:
+                mat[c2][c1] = 1
+    
+    grid = Grid(matrix=mat)
+
+    multiplier = (1, 1)
+
+    xoffset = snapToGrid(searchbounds.width(), GRIDSIZE[0])
+    yoffset = snapToGrid(searchbounds.height(), GRIDSIZE[1])
+
+    if a.x() < b.x() and a.y() < b.y():
+        print("bottom right")
+        start = grid.node(0, 0)
+        end = grid.node(len(mat[0])-1, len(mat)-1)
+        anchor = QPointF(0, Socket.PILLSIZE.width())
+
+    elif a.x() < b.x() and a.y() > b.y():
+        print("top right")
+        start = grid.node(0, len(mat)-1)
+        end = grid.node(len(mat[0])-1, 0)
+        anchor = QPointF(0, -yoffset+Socket.PILLSIZE.width())
+
+    elif a.x() > b.x() and a.y() < b.y():
+        print("bottom left")
+        start = grid.node(len(mat[0])-1, 0)
+        end = grid.node(0, len(mat)-1)
+        anchor = QPointF(-xoffset, (yoffset**-1)+Socket.PILLSIZE.width())
+
+    elif a.x() > b.x() and a.y() > b.y():
+        print("top left")
+        start = grid.node(len(mat[0])-1, len(mat)-1)
+        end = grid.node(0, 0)
+        anchor = QPointF(-xoffset, -yoffset+Socket.PILLSIZE.width())
+
+    finder = AStarFinder(diagonal_movement=DiagonalMovement.always)
+    path, runs = finder.find_path(start, end, grid)
+    translatedpath = []
+    for coordinate in path:
+        mat[coordinate[1]][coordinate[0]] = 'x'
+        translatedpath.append((coordinate[0]*GRIDSIZE[0]*multiplier[0], coordinate[1]*GRIDSIZE[1]*multiplier[1]))
+    return translatedpath, anchor
