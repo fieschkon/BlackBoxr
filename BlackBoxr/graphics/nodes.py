@@ -12,7 +12,7 @@ from PySide6.QtWidgets import (
     QGraphicsItem, QGraphicsScene, QWidgetAction, QGraphicsRectItem, QGraphicsLineItem, QGraphicsPathItem, QGraphicsProxyWidget, QLabel, QApplication, QUndoView, QStatusBar
 )
 from PySide6 import QtCore, QtWidgets
-from PySide6.QtCore import Qt, QRectF, QRect, QPointF, QVariantAnimation, QEasingCurve, QLineF, QPoint, QRunnable, Signal, QThreadPool, QObject, Slot
+from PySide6.QtCore import Qt, QRectF, QRect, QPointF, QVariantAnimation, QEasingCurve, QLineF, QPoint, QRunnable, Signal, QThreadPool, QObject, Slot, QThread
 from PySide6 import QtGui
 from PySide6.QtGui import QTransform, QPixmap, QAction, QPainter, QColor, QPen, QBrush, QCursor, QPainterPath, QFont, QFontMetrics, QUndoStack, QKeySequence, QWheelEvent
 
@@ -591,7 +591,8 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
         self._arrow_width = 4
         self.moved = True
         self.nodePath = []
-        self.worker = None
+        self.worker : PathingRunnable = None
+        self.threadpool = QThreadPool()
 
     def setSource(self, point: QtCore.QPointF):
         self._sourcePoint = point
@@ -624,7 +625,13 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
         mid_x = s.x() + ((d.x() - s.x()) * 0.2)
 
         if self.moved:
-            self.nodePath = pathfind( self.mapToScene(s), self.mapToScene(d), self.scene(), self.scene().views()[0], [])
+            searchbounds : QRectF = buildSearchBounds(self.mapToScene(s), self.mapToScene(d), self.scene())
+            #self.nodePath = pathfind( self.mapToScene(s), self.mapToScene(d), searchbounds, generateMatrixFromScene(searchbounds, self.scene()))
+            if self.worker != None:
+                self.worker.terminate()
+            self.worker = PathingThread(self.updatePath, self.mapToScene(s), self.mapToScene(d), searchbounds, generateMatrixFromScene(searchbounds, self.scene())) # Any other args, kwargs are passed to the run function
+            
+            
 
         path = QtGui.QPainterPath(s)
 
@@ -707,7 +714,35 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
         if triangle_source is not None:
             painter.drawPolyline(triangle_source)
 
-def buildSearchBounds(a: QPointF, b: QPointF, scene: QGraphicsScene, view: QGraphicsView):
+class PathingRunnable(QRunnable):
+    def __init__(self, fn, a: QPointF, b: QPointF, searchbounds, mat):
+        super().__init__()
+        self.a = a
+        self.b = b
+        self.searchbounds = searchbounds
+        self.mat = mat
+        self.fn = fn
+
+    @Slot()
+    def run(self):
+        self.fn(pathfind(self.a, self.b, self.searchbounds, self.mat))
+
+class PathingThread(QThread):
+    def __init__(self, fn, a: QPointF, b: QPointF, searchbounds, mat):
+        super().__init__()
+        self.a = a
+        self.b = b
+        self.searchbounds = searchbounds
+        self.mat = mat
+        self.fn = fn
+        self.setTerminationEnabled(False)
+        self.run()
+    @Slot()
+    def run(self):
+        self.fn(pathfind(self.a, self.b, self.searchbounds, self.mat))
+
+
+def buildSearchBounds(a: QPointF, b: QPointF, scene: QGraphicsScene):
     topleft = a if a.x() <= b.x() and a.y() <= b.y() else b
     bottomright = b if a.x() <= b.x() and a.y() <= b.y() else a
     
@@ -729,28 +764,16 @@ def buildSearchBounds(a: QPointF, b: QPointF, scene: QGraphicsScene, view: QGrap
         #print("Top Left")
         topleft = b
         bottomright = a
-    return QRectF(topleft, bottomright)
 
-def pathfind(a: QPointF, b: QPointF, scene: QGraphicsScene, view: QGraphicsView, ignoreditems: list[QGraphicsItem]):
-    searchbounds : QRectF = buildSearchBounds(a, b, scene, view)
-
-    if searchbounds.width() == 0:
-        searchbounds.setWidth(10) 
-        searchbounds.setX(searchbounds.x()-5)
-    if searchbounds.height() == 0:
-        searchbounds.setHeight(10) 
-        searchbounds.setY(searchbounds.y()-5)
-
+    searchbounds = QRectF(topleft, bottomright)
     for item in scene.items(searchbounds):
         if not isinstance(item, ArrowItem):
             rect = item.sceneBoundingRect()
             rect.adjust(-GRIDSIZE[0], -GRIDSIZE[1], GRIDSIZE[0], GRIDSIZE[1])
             searchbounds |= rect
-    
-    #view.mapToScene(view.viewport().geometry()).boundingRect()
-    # 
-    # QRectF(topleft, bottomright)
+    return searchbounds
 
+def generateMatrixFromScene(searchbounds, scene):
     mat = [[1 for _ in range(math.ceil(searchbounds.width() / GRIDSIZE[0]))]
            for _ in range(math.ceil(searchbounds.height() / GRIDSIZE[1]))]
     for c2 in range(len(mat)):
@@ -764,7 +787,15 @@ def pathfind(a: QPointF, b: QPointF, scene: QGraphicsScene, view: QGraphicsView,
                 mat[c2][c1] = -1
             else:
                 mat[c2][c1] = 1
+    return mat
 
+def pathfind(a: QPointF, b: QPointF, searchbounds, mat):
+    if searchbounds.width() == 0:
+        searchbounds.setWidth(10) 
+        searchbounds.setX(searchbounds.x()-5)
+    if searchbounds.height() == 0:
+        searchbounds.setHeight(10) 
+        searchbounds.setY(searchbounds.y()-5)
     grid = Grid(matrix=mat)
 
     gridOffset = (-(GRIDSIZE[0]/2), -(GRIDSIZE[1]/4))
@@ -793,9 +824,6 @@ def pathfind(a: QPointF, b: QPointF, scene: QGraphicsScene, view: QGraphicsView,
         start = grid.node(len(mat[0])-1, len(mat)-1)
         end = grid.node(0, 0)
         
-    print(grid.grid_str())
-    print(f'Start {pointACoords[0]} End {pointACoords[1]}')
-    print(f'Start {pointBCoords[0]} End {pointBCoords[1]}')
     try:
         start = grid.node(pointACoords[0], pointACoords[1])
     except IndexError:
