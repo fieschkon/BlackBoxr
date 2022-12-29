@@ -23,6 +23,7 @@ from BlackBoxr.utilities import closestPoint, printMatrix, snapToGrid
 from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
+from pathfinding.finder.dijkstra import DijkstraFinder
 GRIDSIZE = (25, 25)
 ENDOFFSET = -QPointF(25, 25)
 
@@ -706,12 +707,48 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
         if triangle_source is not None:
             painter.drawPolyline(triangle_source)
 
+def buildSearchBounds(a: QPointF, b: QPointF, scene: QGraphicsScene, view: QGraphicsView):
+    topleft = a if a.x() <= b.x() and a.y() <= b.y() else b
+    bottomright = b if a.x() <= b.x() and a.y() <= b.y() else a
+    
+    #print(f'Original: {view.mapToScene(view.viewport().geometry()).boundingRect()}, New: {QRectF(topleft, bottomright)}')
+
+    if a.x() < b.x() and a.y() < b.y():
+        #print("Bottom Right")
+        topleft = a
+        bottomright = b
+    elif a.x() < b.x() and a.y() > b.y():
+        #print("Top Right")
+        topleft = QPointF(a.x(), b.y())
+        bottomright = QPointF(b.x(), a.y())
+    elif a.x() > b.x() and a.y() < b.y():
+        #print("Bottom Left")
+        topleft = QPointF(b.x(), a.y())
+        bottomright = QPointF(a.x(), b.y())
+    elif a.x() > b.x() and a.y() > b.y():
+        #print("Top Left")
+        topleft = b
+        bottomright = a
+    return QRectF(topleft, bottomright)
 
 def pathfind(a: QPointF, b: QPointF, scene: QGraphicsScene, view: QGraphicsView, ignoreditems: list[QGraphicsItem]):
+    searchbounds : QRectF = buildSearchBounds(a, b, scene, view)
 
-    topleft = QPointF(min(a.x(), b.x()), min(a.y(), b.y()))
-    bottomright = QPointF(max(a.x(), b.x()), max(a.y(), b.y()))
-    searchbounds = view.mapToScene(view.viewport().geometry()).boundingRect()
+    if searchbounds.width() == 0:
+        searchbounds.setWidth(10) 
+        searchbounds.setX(searchbounds.x()-5)
+    if searchbounds.height() == 0:
+        searchbounds.setHeight(10) 
+        searchbounds.setY(searchbounds.y()-5)
+
+    for item in scene.items(searchbounds):
+        if not isinstance(item, ArrowItem):
+            rect = item.sceneBoundingRect()
+            rect.adjust(-GRIDSIZE[0], -GRIDSIZE[1], GRIDSIZE[0], GRIDSIZE[1])
+            searchbounds |= rect
+    
+    #view.mapToScene(view.viewport().geometry()).boundingRect()
+    # 
     # QRectF(topleft, bottomright)
 
     mat = [[1 for _ in range(math.ceil(searchbounds.width() / GRIDSIZE[0]))]
@@ -743,27 +780,36 @@ def pathfind(a: QPointF, b: QPointF, scene: QGraphicsScene, view: QGraphicsView,
     if a.x() < b.x() and a.y() < b.y():
         start = grid.node(0, 0)
         end = grid.node(len(mat[0])-1, len(mat)-1)
-        anchor = QPointF(0, Socket.PILLSIZE.width())
 
     elif a.x() < b.x() and a.y() > b.y():
         start = grid.node(0, len(mat)-1)
         end = grid.node(len(mat[0])-1, 0)
-        anchor = QPointF(0, -yoffset+Socket.PILLSIZE.width())
 
     elif a.x() > b.x() and a.y() < b.y():
         start = grid.node(len(mat[0])-1, 0)
         end = grid.node(0, len(mat)-1)
-        anchor = QPointF(-xoffset, (yoffset**-1)+Socket.PILLSIZE.width())
 
     elif a.x() > b.x() and a.y() > b.y():
         start = grid.node(len(mat[0])-1, len(mat)-1)
         end = grid.node(0, 0)
-        anchor = QPointF(-xoffset, -yoffset+Socket.PILLSIZE.width())
+        
+    print(grid.grid_str())
+    print(f'Start {pointACoords[0]} End {pointACoords[1]}')
+    print(f'Start {pointBCoords[0]} End {pointBCoords[1]}')
+    try:
+        start = grid.node(pointACoords[0], pointACoords[1])
+    except IndexError:
+        pointACoords = (math.floor((a.x()-searchbounds.x()) /
+                        GRIDSIZE[0])-1, math.floor((a.y()-searchbounds.y())/GRIDSIZE[1]))
+        start = grid.node(pointACoords[0], pointACoords[1])
+    try:
+        end = grid.node(pointBCoords[0], pointBCoords[1])
+    except IndexError:
+        pointBCoords = (math.floor((b.x()-searchbounds.x()) /
+                    GRIDSIZE[0])-1, math.floor((b.y()-searchbounds.y())/GRIDSIZE[1])-1)
+        end = grid.node(pointBCoords[0], pointBCoords[1])
 
-    start = grid.node(pointACoords[0], pointACoords[1])
-    end = grid.node(pointBCoords[0], pointBCoords[1])
-
-    finder = AStarFinder(
+    finder = DijkstraFinder(
         diagonal_movement=DiagonalMovement.only_when_no_obstacle)
     path, runs = finder.find_path(start, end, grid)
     translatedpath = []
