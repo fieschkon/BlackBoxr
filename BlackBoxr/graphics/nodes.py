@@ -272,6 +272,8 @@ class RequirementNode(NodeBase):
         self.topSocket = Socket(self, None, vertical=True)
         self.bottomSocket = Socket(self, None, vertical=True)
 
+
+
     def boundingRect(self):
         proxysize = self.proxy.size()
         return QRectF(0, 0, proxysize.width(), proxysize.height())
@@ -284,6 +286,19 @@ class RequirementNode(NodeBase):
             (bbox.width()/2)-(Socket.PILLSIZE.width()/2), bbox.height())
         self.topSocket.setPos(
             (bbox.width()/2)-(Socket.PILLSIZE.width()/2), -Socket.PILLSIZE.width())
+
+    def itemChange(self, change: QtWidgets.QGraphicsItem.GraphicsItemChange, value: typing.Any) -> typing.Any:
+        if change == QGraphicsItem.ItemPositionChange:
+            if self.bottomSocket.trace != None:
+                self.bottomSocket.trace.moved = True
+                self.scene().views()[0].viewport().repaint()
+                self.bottomSocket.trace.moved = False
+            if self.topSocket.trace != None:
+                self.topSocket.trace.moved = True
+                self.scene().views()[0].viewport().repaint()
+                self.topSocket.trace.moved = False
+
+        return super().itemChange(change, value)
 
 
 class ExternalConnections(DesignNode):
@@ -307,7 +322,7 @@ class Socket(QGraphicsItem):
         super(Socket, self).__init__(parent=parent)
         self.parentNode = parent
         self.ownedDL = dl
-        self.__trace = None
+        self.trace = None
         self.setZValue(100)
         self.traces = []
         self.vertical = vertical
@@ -315,6 +330,7 @@ class Socket(QGraphicsItem):
                       QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
         self.preview = preview
         self.spriteOpacity = 255/2 if self.preview else 255
+
 
     def paint(self, painter, option, widget):
 
@@ -360,16 +376,16 @@ class Socket(QGraphicsItem):
         else:
             try:
                 if objects.qapp.keyboardModifiers() == Qt.ControlModifier:
-                    self.__trace = ArrowItem(source=self.scene().selectedItems()[
+                    self.trace = ArrowItem(source=self.scene().selectedItems()[
                                              0], destination=self, parent=None)
-                    self.__trace.setZValue(0)
-                    self.__trace.setPos(self.scenePos())
-                    self.scene().addItem(self.__trace)
+                    self.trace.setZValue(0)
+                    self.trace.setPos(self.scenePos())
+                    self.scene().addItem(self.trace)
                     self.setSelected(False)
 
                 elif objects.qapp.keyboardModifiers() == Qt.AltModifier:
-                    self.scene().removeItem(self.__trace)
-                    self.__trace = None
+                    self.scene().removeItem(self.trace)
+                    self.trace = None
                 else:
                     for item in self.scene().selectedItems():
                         item.setSelected(False)
@@ -396,37 +412,37 @@ class Socket(QGraphicsItem):
         # Else:
         # Pass
 
-        if self.__trace != None and not self.preview:
-            self.__trace.setZValue(-10)
+        if self.trace != None and not self.preview:
+            self.trace.setZValue(-10)
             item = self.scene().itemAt(event.scenePos(), QTransform())
 
             if isinstance(item, Socket) and item != self and not item.preview:
-                self.__trace._destinationPoint = item
-                item.__trace = self.__trace
-                self.__trace.setZValue(10)
-                self.__trace.moved = False
+                self.trace._destinationPoint = item
+                item.trace = self.trace
+                self.trace.setZValue(10)
+                self.trace.moved = False
 
             elif isinstance(item, DesignNode):
                 socket = item.materializePreview(
                     self.mapToItem(item, event.pos()))
-                self.__trace._destinationPoint = socket
-                socket.__trace = self.__trace
-                self.__trace.setZValue(10)
-                self.__trace.moved = False
+                self.trace._destinationPoint = socket
+                socket.trace = self.trace
+                self.trace.setZValue(10)
+                self.trace.moved = False
             else:
-                self.scene().removeItem(self.__trace)
-                self.__trace = None
+                self.scene().removeItem(self.trace)
+                self.trace = None
 
     def mouseMoveEvent(self, event: QtWidgets.QGraphicsSceneMouseEvent) -> None:
-        if isinstance(self.__trace, NoneType):
-            self.__trace = ArrowItem(
+        if isinstance(self.trace, NoneType):
+            self.trace = ArrowItem(
                 source=self, destination=event.pos(), parent=None)
-            self.__trace.setZValue(0)
-            self.__trace.setPos(self.scenePos())
-            self.scene().addItem(self.__trace)
+            self.trace.setZValue(0)
+            self.trace.setPos(self.scenePos())
+            self.scene().addItem(self.trace)
             self.setSelected(False)
-        self.__trace.prepareGeometryChange()
-        self.__trace._destinationPoint = event.pos()
+        self.trace.prepareGeometryChange()
+        self.trace._destinationPoint = event.pos()
 
     def anchorPoint(self) -> QPointF:
         boundingrect = self.boundingRect()
@@ -575,7 +591,6 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
         self.moved = True
         self.nodePath = []
         self.worker = None
-        self.threadpool = QThreadPool()
 
     def setSource(self, point: QtCore.QPointF):
         self._sourcePoint = point
@@ -585,7 +600,6 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
 
     def itemChange(self, change: QtWidgets.QGraphicsItem.GraphicsItemChange, value: typing.Any) -> typing.Any:
         if change == QGraphicsItem.ItemPositionChange:
-
             self.moved = True
 
         return super().itemChange(change, value)
@@ -624,7 +638,7 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
         path.lineTo(d.x(), d.y())'''
 
         return path
-
+    
     def updatePath(self, nodes):
         self.nodePath = nodes
 
