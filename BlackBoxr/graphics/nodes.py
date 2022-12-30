@@ -5,6 +5,7 @@ import math
 import random
 import sys
 import threading
+import time
 from types import NoneType
 import typing
 from PySide6.QtWidgets import (
@@ -24,7 +25,7 @@ from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
 from pathfinding.finder.dijkstra import DijkstraFinder
-GRIDSIZE = (25, 25)
+GRIDSIZE = (50, 50)
 ENDOFFSET = -QPointF(25, 25)
 
 
@@ -626,12 +627,16 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
 
         if self.moved:
             searchbounds : QRectF = buildSearchBounds(self.mapToScene(s), self.mapToScene(d), self.scene())
-            #self.nodePath = pathfind( self.mapToScene(s), self.mapToScene(d), searchbounds, generateMatrixFromScene(searchbounds, self.scene()))
             if self.worker != None:
                 self.worker.terminate()
-            self.worker = PathingThread(self.updatePath, self.mapToScene(s), self.mapToScene(d), searchbounds, generateMatrixFromScene(searchbounds, self.scene())) # Any other args, kwargs are passed to the run function
+
+            mat = generateMatrixFromScene(searchbounds, self.scene())
+            #self.nodePath = pathfind(self.mapToScene(s), self.mapToScene(d), searchbounds, mat)
+            self.worker = PathingThread(self.updatePath, self.mapToScene(s), self.mapToScene(d), searchbounds, mat) # Any other args, kwargs are passed to the run function
+            self.worker.start()
             
-            
+
+
 
         path = QtGui.QPainterPath(s)
 
@@ -773,20 +778,39 @@ def buildSearchBounds(a: QPointF, b: QPointF, scene: QGraphicsScene):
             searchbounds |= rect
     return searchbounds
 
-def generateMatrixFromScene(searchbounds, scene):
+def generateMatrixFromScene(searchbounds : QRectF, scene: QGraphicsScene):
     mat = [[1 for _ in range(math.ceil(searchbounds.width() / GRIDSIZE[0]))]
            for _ in range(math.ceil(searchbounds.height() / GRIDSIZE[1]))]
-    for c2 in range(len(mat)):
-        for c1 in range(len(mat[0])):
-            x = searchbounds.x() + (GRIDSIZE[0] * c1)
-            y = searchbounds.y() + (GRIDSIZE[0] * c2)
-            t = scene.itemAt(QPointF(float(x), float(y)), QTransform())
-            items = scene.items(QPointF(float(x), float(y)))
-            types = [type(item) for item in items]
-            if QGraphicsProxyWidget in types:
-                mat[c2][c1] = -1
-            else:
-                mat[c2][c1] = 1
+
+    detected = scene.items(searchbounds)
+    for item in detected:
+        if type(item) not in [QGraphicsProxyWidget, Socket, ArrowItem]:
+            itemrect = item.sceneBoundingRect()
+
+            # Cutoff off screen
+            itemrect.translate(-searchbounds.x(), -searchbounds.y())
+            itemrect.setWidth(itemrect.width()+min(0, itemrect.x()))
+            itemrect.setX(max(itemrect.x(), 0))
+            itemrect.setHeight(itemrect.height()+min(0, itemrect.y()))
+            itemrect.setY(max(itemrect.y(), 0))
+            
+            # Width of item in cells
+            itemw = math.ceil(itemrect.width()/GRIDSIZE[0])
+            # Height 
+            itemh = math.ceil(itemrect.height()/GRIDSIZE[1])
+            # Column (x) base
+            col = math.ceil((itemrect.x())/GRIDSIZE[0])
+            # Row (y) base
+            row = math.ceil((itemrect.y())/GRIDSIZE[1])
+            try:
+                colbase = max(col, 0)
+                rowbase = max(row, 0)
+                for colit in range(colbase, colbase+itemw):
+                    for rowit in range(rowbase, rowbase+itemh):
+                        mat[rowit][colit] = -1
+            except IndexError as e:
+                print(f'Index Error at {colit}, {rowit}')
+    
     return mat
 
 def pathfind(a: QPointF, b: QPointF, searchbounds, mat):
@@ -841,8 +865,8 @@ def pathfind(a: QPointF, b: QPointF, searchbounds, mat):
         diagonal_movement=DiagonalMovement.only_when_no_obstacle)
     path, runs = finder.find_path(start, end, grid)
     translatedpath = []
+
     for coordinate in path:
-        mat[coordinate[1]][coordinate[0]] = 'x'
         p = (coordinate[0]*GRIDSIZE[0]+gridOffset[0]+searchbounds.x()+Socket.PILLSIZE.width(),
              coordinate[1]*GRIDSIZE[1]+gridOffset[1]+searchbounds.y()+Socket.PILLSIZE.height())
         translatedpath.append(p)

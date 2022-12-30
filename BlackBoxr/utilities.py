@@ -1,4 +1,5 @@
 # Get first item in iterable
+import copy
 from datetime import datetime
 import logging
 import os
@@ -131,7 +132,8 @@ def diffdict(dictA : dict, dictB : dict):
   return list(diff(dictA, dictB))
 
 def printMatrix(mat : list[list]):
-  for row in mat:
+  workedmat = [[_el if _el != -1 else 0 for _el in _ar] for _ar in mat]
+  for row in workedmat:
     print(row)
 
 def snapToGrid(val, base):
