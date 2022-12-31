@@ -25,6 +25,10 @@ from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
 from pathfinding.finder.dijkstra import DijkstraFinder
+
+
+
+
 GRIDSIZE = (25, 25)
 ENDOFFSET = -QPointF(25, 25)
 
@@ -94,6 +98,7 @@ class NodeBase(QGraphicsItem):
     def renamed(self):
         objects.undoStack.push(NameEdit(self, self.lbl.namelabel.text()))
         self.blockname = self.lbl.namelabel.text()
+
 
 
 class DesignNode(NodeBase):
@@ -271,10 +276,8 @@ class RequirementNode(NodeBase):
         self.lbl = DisplayItem(self.ownedRL)
         self.proxy.setWidget(self.lbl)
 
-        self.topSocket = Socket(self, None, vertical=True)
-        self.bottomSocket = Socket(self, None, vertical=True)
-
-
+        self.topSocket = Socket(self, None, vertical=True, type=Socket.IOTYPE.IN)
+        self.bottomSocket = Socket(self, None, vertical=True, type=Socket.IOTYPE.OUT)
 
     def boundingRect(self):
         proxysize = self.proxy.size()
@@ -299,6 +302,41 @@ class RequirementNode(NodeBase):
 
         return super().itemChange(change, value)
 
+    def mouseDoubleClickEvent(self, event: QtWidgets.QGraphicsSceneMouseEvent) -> None:
+        print(self.ownedRL.toDict())
+        return super().mouseDoubleClickEvent(event)
+
+    def getDownstreamItems(self):
+        return [trace._destinationPoint.parentNode for trace in self.bottomSocket.traces]
+
+    def repaintTraces(self):
+        for trace in self.bottomSocket.traces + self.topSocket.traces:
+            trace.show()
+            trace.update()
+        self.topSocket.flagForRepaint()
+        self.bottomSocket.flagForRepaint()
+        self.scene().update()
+
+    def moveTo(self, pos : QPointF):
+        self.anim = QVariantAnimation()
+        self.anim.setDuration(500)
+        self.anim.setEasingCurve(QEasingCurve.OutQuad)
+        self.anim.setStartValue(self.pos())
+        self.anim.setEndValue(pos)
+        self.anim.valueChanged.connect(self._moveTick)
+        self.anim.finished.connect(self.repaintTraces)
+        self.anim.start()
+        
+
+    def _moveTick(self, pos):
+        self.prepareGeometryChange()
+        for trace in self.bottomSocket.traces + self.topSocket.traces:
+            trace.hide()
+        self.setPos(pos)
+        self.update()
+
+        self.hoverEnterEvent(None)
+        self.hoverLeaveEvent(None)
 
 class ExternalConnections(DesignNode):
     def __init__(self, bbox, *args, **kwargs):
@@ -328,7 +366,7 @@ class Socket(QGraphicsItem):
         self.ownedDL = dl
         self.trace = None
         self.setZValue(100)
-        self.traces = []
+        self.traces : list[ArrowItem] = []
         self.vertical = vertical
         self.setFlags(self.flags() | QGraphicsItem.GraphicsItemFlag.ItemIsSelectable |
                       QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
@@ -380,18 +418,20 @@ class Socket(QGraphicsItem):
 
         else:
             try:
-                if objects.qapp.keyboardModifiers() == Qt.ControlModifier:
-                    self.trace = ArrowItem(source=self.scene().selectedItems()[
-                                             0], destination=self, parent=None)
+                selectedItem = self.scene().selectedItems()[0]
+                if objects.qapp.keyboardModifiers() == Qt.ControlModifier and isinstance(selectedItem, Socket):
+                    self.trace = ArrowItem(source=selectedItem, destination=self, parent=None)
                     self.connectTrace(self.trace)
                     self.trace.setZValue(0)
                     self.trace.setPos(self.scenePos())
                     self.scene().addItem(self.trace)
                     self.setSelected(False)
+                    if isinstance(self.parentNode, RequirementNode) and isinstance(selectedItem.parentNode, RequirementNode):
+                        selectedItem.parentNode.ownedRL.addDownstream(self.parentNode.ownedRL)
 
                 elif objects.qapp.keyboardModifiers() == Qt.AltModifier:
                     self.scene().removeItem(self.trace)
-                    self.disconnectTrace(self.trace)
+                    self.disconnectAll()
                     self.trace = None
                 else:
                     for item in self.scene().selectedItems():
@@ -406,7 +446,14 @@ class Socket(QGraphicsItem):
     def disconnectTrace(self, trace):
         self.scene().removeItem(trace)
         if trace in self.traces:
+            trace : ArrowItem = trace
+            if isinstance(trace._sourcePoint.parentNode, RequirementNode):
+                trace._sourcePoint.parentNode.ownedRL.removeFromStreams(trace._destinationPoint.parentNode.ownedRL)
             self.traces.remove(trace)
+    
+    def disconnectAll(self):
+        for trace in self.traces:
+            self.disconnectTrace(trace)
 
     def flagForRepaint(self, shouldrepaint = True):
         for trace in self.traces:
@@ -439,6 +486,9 @@ class Socket(QGraphicsItem):
                 self.connectTrace(self.trace)
                 self.trace.setZValue(10)
                 self.trace.moved = False
+
+                if isinstance(self.parentNode, RequirementNode):
+                    self.parentNode.ownedRL.addDownstream(item.parentNode.ownedRL)
 
             elif isinstance(item, DesignNode):
                 socket = item.materializePreview(
@@ -477,136 +527,6 @@ class Socket(QGraphicsItem):
     def anchorPoint(self) -> QPointF:
         boundingrect = self.boundingRect()
         return QPointF((boundingrect.width() / 2), (boundingrect.height() / 2))
-
-
-class OldArrowItem(QGraphicsLineItem):
-    ''' ArrowItem represents connections between items '''
-
-    def __init__(self, startItem, endItem, parent=None):
-        """
-        ArrowItem represents a connection between two items
-        @params:
-            Set style to 2 for a dotted line
-        """
-
-        super(OldArrowItem, self).__init__() if isinstance(
-            parent, NoneType) else super(OldArrowItem, self).__init__(parent)
-        # self.setZValue(1)
-
-        self.arrowHead = QtGui.QPolygonF()
-        self.myStartItem = startItem
-        self.myEndItem = endItem
-        self.myColor = QColor(255, 0, 0, 255)
-        pen = QPen()
-        pen.setColor(self.myColor)
-        pen.setWidth(5)
-        pen.setCapStyle(QtCore.Qt.PenCapStyle.RoundCap)
-        pen.setJoinStyle(QtCore.Qt.PenJoinStyle.RoundJoin)
-        self.setPen(pen)
-
-        self.setAcceptHoverEvents(True)
-
-    def startItem(self):
-        return self.myStartItem
-
-    def endItem(self):
-        return self.myEndItem
-
-    def setColor(self, color: QColor):
-        self.myColor = color
-
-    def mouseDoubleClickEvent(self, event: 'QGraphicsSceneMouseEvent') -> None:
-        pass
-        '''print("{} : {}\n{} : {}".format(self.myStartItem, self.mapFromParent(self.myStartItem.pos()), self.myEndItem, self.mapFromParent(self.myEndItem.pos())))
-        if isinstance(self.myStartItem, QGraphicsItem):
-            
-            p1 = self.mapFromParent(self.myStartItem.pos())
-        else:
-            p1 = self.myStartItem
-        if isinstance(self.myEndItem, QGraphicsItem):
-            p2 = self.mapFromParent(self.myEndItem.pos())
-        else:
-            p2 = self.myEndItem
-
-        cursorpos : QPointF = self.scene().views()[0].mapToScene(self.scene().views()[0].mapFromGlobal(QtGui.QCursor.pos()))
-        distToStart = math.sqrt((cursorpos.x() - self.myStartItem.x())**2 + (cursorpos.y() - self.myStartItem.y())**2)
-        distToEnd = math.sqrt((cursorpos.x() - self.myEndItem.x())**2 + (cursorpos.y() - self.myEndItem.y())**2)
-        if distToStart < distToEnd:
-            #self.scene.views()[0].centerOn(self.myEndItem)
-            self.scene().views()[0].moveTo(self.myEndItem)
-        else:
-            #self.scene.views()[0].centerOn(self.myStartItem)
-            self.scene().views()[0].moveTo(p1)
-        return super().mouseDoubleClickEvent(event)'''
-
-    def boundingRect(self):
-        extra = (self.pen().width() + 20) / 2.0
-        p1 = self.line().p1()
-        p2 = self.line().p2()
-        return QtCore.QRectF(p1, QtCore.QSizeF(p2.x() - p1.x(), p2.y() - p1.y())).normalized().adjusted(-extra, -extra, extra, extra)
-
-    def shape(self):
-        path = super(OldArrowItem, self).shape()
-        path.addPolygon(self.arrowHead)
-        return path
-
-    def updatePosition(self):
-        line = QtCore.QLineF(self.mapFromItem(
-            self.myStartItem, 0, self.myStartItem.rect.y()), self.mapFromItem(self.myEndItem, 0, 0))
-        self.setLine(line)
-
-    def hoverEnterEvent(self, event: 'QGraphicsSceneHoverEvent') -> None:
-        self.myColor = QColor(0, 255, 0)
-        return super().hoverEnterEvent(event)
-
-    def hoverLeaveEvent(self, event: 'QGraphicsSceneHoverEvent') -> None:
-        self.myColor = QColor(random.randint(
-            0, 5), random.randint(0, 5), random.randint(0, 5))
-        return super().hoverLeaveEvent(event)
-
-    def paint(self, painter, option, widget=None):
-        if isinstance(self.myStartItem, QGraphicsItem):
-            myStartItem = self.mapFromParent(self.myStartItem.scenePos())
-        else:
-            myStartItem = self.myStartItem
-        if isinstance(self.myEndItem, QGraphicsItem):
-            myEndItem = self.mapFromParent(self.myEndItem.scenePos())
-
-        else:
-            myEndItem = self.myEndItem
-
-        myPen = self.pen()
-        myPen.setColor(self.myColor)
-        arrowSize = 10.0
-        painter.setPen(myPen)
-        painter.setBrush(self.myColor)
-
-        # startpos = QPointF(myStartItem.x() + (self.myStartItem.boundingRect().x() / 2), myStartItem.y() + self.myStartItem.boundingRect().y())
-
-        p1 = myStartItem
-
-        p2 = myEndItem
-
-        self.setLine(QtCore.QLineF(p1, p2))
-        line = self.line()
-        try:
-            angle = math.acos(line.dx() / line.length())
-            if line.dy() >= 0:
-                angle = (math.pi * 2.0) - angle
-
-            arrowP1 = line.p1() + QtCore.QPointF(math.sin(angle + math.pi / 3.0) * arrowSize,
-                                                 math.cos(angle + math.pi / 3) * arrowSize)
-            arrowP2 = line.p1() + QtCore.QPointF(math.sin(angle + math.pi - math.pi / 3.0) * arrowSize,
-                                                 math.cos(angle + math.pi - math.pi / 3.0) * arrowSize)
-
-            self.arrowHead.clear()
-            for point in [line.p1(), arrowP1, arrowP2]:
-                self.arrowHead.append(point)
-
-            painter.drawLine(line)
-            painter.drawPolygon(self.arrowHead)
-        except ZeroDivisionError:
-            pass
 
 
 class ArrowItem(QtWidgets.QGraphicsPathItem):

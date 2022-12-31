@@ -107,16 +107,33 @@ class MainWindow(QWidget):
             'Rationale' : 'Skaboingus',
             'Metric' : 'Cum per second'
         }
+
+        rl2data = Datatypes.RequirementElement(testSys)
+        rl2data.public = {
+            'name' : 'Boingus',
+            'requirement' : 'Skadoosh',
+            'Rationale' : 'Skaboingus',
+            'Metric' : 'Cum per second'
+        }
+
+        rl3data = Datatypes.RequirementElement(testSys)
+        rl3data.public = {
+            'name' : 'Boingus',
+            'requirement' : 'Skadoosh',
+            'Rationale' : 'Skaboingus',
+            'Metric' : 'Cum per second'
+        }
+
         rl = RequirementNode(rldata)
         testDV.Scene.addItem(rl)
         testDV.Viewer.centerOn(rl)
         rl.setPos(300, 400)
 
-        rl2 = RequirementNode(rldata)
+        rl2 = RequirementNode(rl2data)
         testDV.Scene.addItem(rl2)
         rl2.setPos(700, 400)
 
-        rl3 = RequirementNode(rldata)
+        rl3 = RequirementNode(rl3data)
         testDV.Scene.addItem(rl3)
         rl3.setPos(1000, 400)
 

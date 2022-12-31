@@ -314,6 +314,22 @@ class RequirementElement(Element):
         if str(self.uuid) not in RL.downstream:
             RL.downstream.append(str(self.uuid))
 
+    def removeDownstream(self, RL):
+        if str(RL.uuid) in self.downstream:
+            self.downstream.remove(str(RL.uuid))
+        if str(self.uuid) in RL.upstream:
+            RL.upstream.remove(str(self.uuid))
+
+    def removeUpstream(self, RL):
+        if str(RL.uuid) in self.upstream:
+            self.upstream.remove(str(RL.uuid))
+        if str(self.uuid) in RL.downstream:
+            RL.downstream.remove(str(self.uuid))
+
+    def removeFromStreams(self, RL):
+        self.removeDownstream(RL)
+        self.removeUpstream(RL)
+
     def isDownstream(self, dsitem) -> bool:
         return str(dsitem.uuid) in self.downstream
 

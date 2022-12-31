@@ -21,36 +21,47 @@ from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
 
+from igraph import Graph, EdgeSeq
+
 GRIDSIZE = (25, 25)
 ENDOFFSET = -QPointF(25, 25)
+
 
 class DiagramViewer(QGraphicsView):
 
     newVisibleArea = Signal(QRectF)
 
-    def __init__(self, scene : QGraphicsScene):
+    def __init__(self, scene: QGraphicsScene):
         super(DiagramViewer, self).__init__(scene)
         self._scene = scene
         self.startPos = None
         self.setAcceptDrops(True)
-        
+
         self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
         self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
 
     ''' Item Focusing '''
-    def moveTo(self, pos : QPointF):
+
+    def moveTo(self, pos: QPointF):
         self.anim = QVariantAnimation()
         self.anim.setDuration(500)
         self.anim.setEasingCurve(QEasingCurve.InOutQuart)
         self.anim.setStartValue(self.mapToScene(self.rect().center()))
         self.anim.setEndValue(QPointF(pos.x(), pos.y()))
         self.anim.valueChanged.connect(self._moveTick)
+        self.anim.finished.connect(self.repaintTraces)
         self.anim.start()
 
     def _moveTick(self, pos):
         self.centerOn(pos)
 
+    def repaintTraces(self):
+        self._scene.requestRepaintTraces()
+        self._scene.update()
+        self.update()
+
     ''' Drag and Drop behavior '''
+
     def dropEvent(self, event: QtGui.QDropEvent) -> None:
         return super().dropEvent(event)
 
@@ -69,8 +80,9 @@ class DiagramViewer(QGraphicsView):
     ''' Scroll behavior
     Responsible for scaling when scrolling
     '''
-    def wheelEvent(self, event : QWheelEvent, norep = False):
-        
+
+    def wheelEvent(self, event: QWheelEvent, norep=False):
+
         if Qt.KeyboardModifier.ControlModifier == event.modifiers():
 
             self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
@@ -80,16 +92,23 @@ class DiagramViewer(QGraphicsView):
                 self.scale(0.9, 0.9)
         else:
             super(DiagramViewer, self).wheelEvent(event)
-        self.newVisibleArea.emit(self.mapToScene(self.viewport().geometry()).boundingRect())
+        self.newVisibleArea.emit(self.mapToScene(
+            self.viewport().geometry()).boundingRect())
         self._scene.update()
+
+    def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
+        if objects.qapp.keyboardModifiers() == (Qt.ControlModifier | Qt.AltModifier) and event.key() == Qt.Key_F:
+            self._scene.formatRequirements()
+        return super().keyPressEvent(event)
+
 
 class DiagramScene(QGraphicsScene):
 
     def __init__(self):
         super().__init__()
-        
-        self._dragged= False
-        #self.setBackgroundBrush(configuration.GridColor)
+
+        self._dragged = False
+        # self.setBackgroundBrush(configuration.GridColor)
 
     def set_viewer(self, viewer):
         self.viewer = viewer
@@ -111,72 +130,101 @@ class DiagramScene(QGraphicsScene):
 
         return super().drawBackground(painter, rect)
 
-    def searchByUUID(self, uuid : str):
+    def searchByUUID(self, uuid: str):
         db = self.items()
         hit = None
         for item in db:
-            if item.__class__ == 'Socket' and str(item.ownedDL.uuid) == uuid:
+            if item.__class__.__name__ == 'DesignNode' and str(item.ownedDL.uuid) == uuid:
                 hit = item
                 break
-            elif item.__class__ == 'DesignNode' and str(item.ownedDL.uuid) == uuid:
+            elif item.__class__.__name__ == 'RequirementNode' and str(item.ownedRL.uuid) == uuid:
                 hit = item
                 break
         return hit
 
+    def formatRequirements(self):
+        g = Graph()
+        testuuid = ""
+        reqnodes = [itemiter for itemiter in self.items(
+        ) if itemiter.__class__.__name__ == 'RequirementNode']
+        for item in reqnodes:
+            g.add_vertex(str(item.ownedRL.uuid))
+            testuuid = str(item.ownedRL.uuid)
+        for item in reqnodes:
+            for downstreamitem in item.getDownstreamItems():
+                g.add_edge(str(item.ownedRL.uuid), str(
+                    downstreamitem.ownedRL.uuid))
+
+        # Sort diagramitems by top to bottom
+
+        # Our chosen root:
+        root = 0
+        layout = g.layout("rt", root)
+        offset = QPointF(0, 0)
+        named_vertex_list = g.vs["name"]
+
+        lookup = {}
+
+        '''for i, it in enumerate(named_vertex_list):
+            it = self.searchByUUID(it)
+            
+            tarx = layout.coords[i][0] * (380 * math.log(len(layout.coords)))
+            tary = layout.coords[i][1] * (480 * len(layout.coords[0]))
+            #it.moveTo(QPointF(tarx, tary))
+            it.setPos(QPointF(tarx, tary))'''
+
+        # Capture original and ideal positions
+        for i, vertex in enumerate(named_vertex_list):
+            item = self.searchByUUID(vertex)
+
+            idealX = layout.coords[i][0] * (380 * math.log(len(layout.coords)))
+            idealY = layout.coords[i][1] * (480 * len(layout.coords[0]))
+
+            lookup[vertex] = {
+                'ideal':             {
+                    'x': idealX,
+                    'y': idealY
+                },
+                'original':             {
+                    'x': item.x(),
+                    'y': item.y()
+                },
+            }
+            item.setPos(idealX, idealY)
+
+
+        # Calculate Midpoint
+        itemsbbox = self.itemsBoundingRect()
+        scenebbox = self.sceneRect()
+        offset.setX((scenebbox.width()/2)-(itemsbbox.width()/2))
+        offset.setY((scenebbox.height()/2)-(itemsbbox.height()/2))
+
+        # Restore position
+        for key, value in lookup.items():
+            item = self.searchByUUID(key)
+            item.setPos(value['original']['x'], value['original']['y'])
+
+        self.views()[0].moveTo(
+            QPointF((scenebbox.width()/2), (scenebbox.height()/2)))
+
+        # Animate move to new point
+        for key, value in lookup.items():
+            item = self.searchByUUID(key)
+            item.moveTo(QPointF(value['ideal']['x']+offset.x(), value['ideal']['y']+offset.y()))
+
+
+
+    def requestRepaintTraces(self):
+        reqnodes = [itemiter for itemiter in self.items(
+        ) if itemiter.__class__.__name__ == 'RequirementNode']
+        for node in reqnodes:
+            node.repaintTraces()
+        self.update()
+
     ''' Mouse Interactions '''
+
     def dragEnterEvent(self, QGraphicsSceneDragDropEvent):
         QGraphicsSceneDragDropEvent.accept()
 
     def dragMoveEvent(self, QGraphicsSceneDragDropEvent):
         QGraphicsSceneDragDropEvent.accept()
-
-
-
-def pathfind(a : QPointF, b : QPointF, scene : QGraphicsScene, ignoreditems : list[QGraphicsItem]):
-
-    topleft = QPointF(min(a.x(), b.x()), min(a.y(), b.y()))
-    bottomright = QPointF(max(a.x(), b.x()), max(a.y(), b.y()))
-    searchbounds = QRectF(topleft, bottomright)
-    
-    mat = [[1 for _ in range(math.ceil(searchbounds.width() / GRIDSIZE[0]))] for _ in range(math.ceil(searchbounds.height() / GRIDSIZE[1]))]
-    for c2 in range(len(mat)):
-        for c1 in range(len(mat[0])):
-            x = searchbounds.x() + (GRIDSIZE[0] * c1)
-            y = searchbounds.y() + (GRIDSIZE[0] * c2)
-            
-            t = scene.itemAt(QPointF(float(x), float(y)), QTransform())
-            mat[c2][c1] = -1 if isinstance(t, NodeBase) and t not in ignoreditems else 1
-    
-    grid = Grid(matrix=mat)
-
-    if a.x() < b.x() and a.y() < b.y():
-
-        start = grid.node(0, 0)
-        end = grid.node(len(mat[0])-1, len(mat)-1)
-        anchor = a
-
-    elif a.x() < b.x() and a.y() > b.y():
-
-        start = grid.node(0, len(mat)-1)
-        end = grid.node(len(mat[0])-1, 0)
-        anchor = a - QPointF(len(mat[0])-1, 0)
-
-    elif a.x() > b.x() and a.y() < b.y():
-
-        start = grid.node(len(mat[0])-1, 0)
-        end = grid.node(0, len(mat)-1)
-        anchor = a - QPointF((len(mat[0])-1) * GRIDSIZE[0], 0)
-
-    elif a.x() > b.x() and a.y() > b.y():
-
-        start = grid.node(len(mat[0])-1, len(mat)-1)
-        end = grid.node(0, 0)
-        anchor = a - QPointF(0, 0)
-
-    finder = AStarFinder(diagonal_movement=DiagonalMovement.always)
-    path, runs = finder.find_path(start, end, grid)
-    translatedpath = []
-    printMatrix(mat)
-
-    return translatedpath, anchor
-
