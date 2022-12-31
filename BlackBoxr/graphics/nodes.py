@@ -25,7 +25,7 @@ from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
 from pathfinding.finder.dijkstra import DijkstraFinder
-GRIDSIZE = (50, 50)
+GRIDSIZE = (25, 25)
 ENDOFFSET = -QPointF(25, 25)
 
 
@@ -291,14 +291,11 @@ class RequirementNode(NodeBase):
 
     def itemChange(self, change: QtWidgets.QGraphicsItem.GraphicsItemChange, value: typing.Any) -> typing.Any:
         if change == QGraphicsItem.ItemPositionChange:
-            if self.bottomSocket.trace != None:
-                self.bottomSocket.trace.moved = True
-                self.scene().views()[0].viewport().repaint()
-                self.bottomSocket.trace.moved = False
-            if self.topSocket.trace != None:
-                self.topSocket.trace.moved = True
-                self.scene().views()[0].viewport().repaint()
-                self.topSocket.trace.moved = False
+            self.bottomSocket.flagForRepaint(True)
+            self.topSocket.flagForRepaint(True)
+            self.scene().views()[0].viewport().repaint()
+            self.bottomSocket.flagForRepaint(False)
+            self.topSocket.flagForRepaint(False)
 
         return super().itemChange(change, value)
 
@@ -319,7 +316,12 @@ class Socket(QGraphicsItem):
 
     PILLSIZE = QRectF(0, 0, 25, 6)
 
-    def __init__(self, parent, dl: DesignElement, vertical=False, preview=False) -> None:
+    class IOTYPE(Enum):
+        IN = 0
+        OUT = 1
+        INOUT = 2
+
+    def __init__(self, parent, dl: DesignElement, vertical=False, preview=False, type=IOTYPE.INOUT) -> None:
 
         super(Socket, self).__init__(parent=parent)
         self.parentNode = parent
@@ -332,6 +334,7 @@ class Socket(QGraphicsItem):
                       QGraphicsItem.GraphicsItemFlag.ItemSendsGeometryChanges)
         self.preview = preview
         self.spriteOpacity = 255/2 if self.preview else 255
+        self.socketType = type
 
 
     def paint(self, painter, option, widget):
@@ -380,6 +383,7 @@ class Socket(QGraphicsItem):
                 if objects.qapp.keyboardModifiers() == Qt.ControlModifier:
                     self.trace = ArrowItem(source=self.scene().selectedItems()[
                                              0], destination=self, parent=None)
+                    self.connectTrace(self.trace)
                     self.trace.setZValue(0)
                     self.trace.setPos(self.scenePos())
                     self.scene().addItem(self.trace)
@@ -387,6 +391,7 @@ class Socket(QGraphicsItem):
 
                 elif objects.qapp.keyboardModifiers() == Qt.AltModifier:
                     self.scene().removeItem(self.trace)
+                    self.disconnectTrace(self.trace)
                     self.trace = None
                 else:
                     for item in self.scene().selectedItems():
@@ -395,9 +400,19 @@ class Socket(QGraphicsItem):
             except IndexError:
                 pass
 
-    def mouseReleaseEvent(self, event):
-        # Todo: cleanup
+    def connectTrace(self, trace):
+            self.traces.append(trace)
 
+    def disconnectTrace(self, trace):
+        self.scene().removeItem(trace)
+        if trace in self.traces:
+            self.traces.remove(trace)
+
+    def flagForRepaint(self, shouldrepaint = True):
+        for trace in self.traces:
+            trace.moved = shouldrepaint
+    
+    def mouseReleaseEvent(self, event):
         # Branch 1. Does trace exist and self is not preview
         # Step 1. Move trace to back
 
@@ -418,9 +433,10 @@ class Socket(QGraphicsItem):
             self.trace.setZValue(-10)
             item = self.scene().itemAt(event.scenePos(), QTransform())
 
-            if isinstance(item, Socket) and item != self and not item.preview:
+            if isinstance(item, Socket) and item != self and not item.preview and self.compatibleSockets(self, item):
                 self.trace._destinationPoint = item
-                item.trace = self.trace
+                item.connectTrace(self.trace)
+                self.connectTrace(self.trace)
                 self.trace.setZValue(10)
                 self.trace.moved = False
 
@@ -428,12 +444,24 @@ class Socket(QGraphicsItem):
                 socket = item.materializePreview(
                     self.mapToItem(item, event.pos()))
                 self.trace._destinationPoint = socket
-                socket.trace = self.trace
+                socket.connectTrace(self.trace)
+                self.connectTrace(self.trace)
                 self.trace.setZValue(10)
                 self.trace.moved = False
             else:
                 self.scene().removeItem(self.trace)
-                self.trace = None
+            self.trace = None
+
+    def compatibleSockets(self, sourceSocket, destinationSocket):
+        sourceSocket : Socket
+        destinationSocket : Socket
+
+        RuleA = (sourceSocket.socketType == Socket.IOTYPE.OUT and destinationSocket.socketType == Socket.IOTYPE.IN)
+        RuleB = (sourceSocket.socketType == Socket.IOTYPE.INOUT and destinationSocket.socketType == Socket.IOTYPE.INOUT)
+        RuleC = (sourceSocket.socketType == Socket.IOTYPE.OUT and destinationSocket.socketType == Socket.IOTYPE.INOUT)
+        RuleD = (sourceSocket.socketType == Socket.IOTYPE.INOUT and destinationSocket.socketType == Socket.IOTYPE.IN)
+
+        return RuleA or RuleB or RuleC or RuleD
 
     def mouseMoveEvent(self, event: QtWidgets.QGraphicsSceneMouseEvent) -> None:
         if isinstance(self.trace, NoneType):
@@ -630,7 +658,7 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
             if self.worker != None:
                 self.worker.terminate()
 
-            mat = generateMatrixFromScene(searchbounds, self.scene())
+            mat = generateMatrixFromScene(searchbounds, self.scene(), [self])
             #self.nodePath = pathfind(self.mapToScene(s), self.mapToScene(d), searchbounds, mat)
             self.worker = PathingThread(self.updatePath, self.mapToScene(s), self.mapToScene(d), searchbounds, mat) # Any other args, kwargs are passed to the run function
             self.worker.start()
@@ -653,7 +681,8 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
         return path
     
     def updatePath(self, nodes):
-        self.nodePath = nodes
+        if nodes != None:
+            self.nodePath = nodes
 
     # calculates the point where the arrow should be drawn
     def arrowCalc(self, arrow_pos, start_point=None, end_point=None):
@@ -778,97 +807,115 @@ def buildSearchBounds(a: QPointF, b: QPointF, scene: QGraphicsScene):
             searchbounds |= rect
     return searchbounds
 
-def generateMatrixFromScene(searchbounds : QRectF, scene: QGraphicsScene):
+def gridPointsFromPath(path : QGraphicsPathItem):
+    qpath = path.path()
+    coords = []
+    for index in range(qpath.elementCount()):
+        point = QPointF(qpath.elementAt(index))
+        coords.append((max(0, math.floor(point.x()/GRIDSIZE[0])-1), max(0, math.floor(point.y()/GRIDSIZE[1])-1)))
+    return coords
+
+def generateMatrixFromScene(searchbounds : QRectF, scene: QGraphicsScene, ignoreditems = []):
     mat = [[1 for _ in range(math.ceil(searchbounds.width() / GRIDSIZE[0]))]
            for _ in range(math.ceil(searchbounds.height() / GRIDSIZE[1]))]
 
     detected = scene.items(searchbounds)
     for item in detected:
-        if type(item) not in [QGraphicsProxyWidget, Socket, ArrowItem]:
-            itemrect = item.sceneBoundingRect()
+        if item not in ignoreditems:
+            # Rectangular Items
+            if type(item) not in [QGraphicsProxyWidget, Socket, ArrowItem]:
+                itemrect = item.sceneBoundingRect()
 
-            # Cutoff off screen
-            itemrect.translate(-searchbounds.x(), -searchbounds.y())
-            itemrect.setWidth(itemrect.width()+min(0, itemrect.x()))
-            itemrect.setX(max(itemrect.x(), 0))
-            itemrect.setHeight(itemrect.height()+min(0, itemrect.y()))
-            itemrect.setY(max(itemrect.y(), 0))
-            
-            # Width of item in cells
-            itemw = math.ceil(itemrect.width()/GRIDSIZE[0])
-            # Height 
-            itemh = math.ceil(itemrect.height()/GRIDSIZE[1])
-            # Column (x) base
-            col = math.ceil((itemrect.x())/GRIDSIZE[0])
-            # Row (y) base
-            row = math.ceil((itemrect.y())/GRIDSIZE[1])
-            try:
-                colbase = max(col, 0)
-                rowbase = max(row, 0)
-                for colit in range(colbase, colbase+itemw):
-                    for rowit in range(rowbase, rowbase+itemh):
-                        mat[rowit][colit] = -1
-            except IndexError as e:
-                print(f'Index Error at {colit}, {rowit}')
-    
+                # Cutoff off screen
+                itemrect.translate(-searchbounds.x(), -searchbounds.y())
+                itemrect.setWidth(itemrect.width()+min(0, itemrect.x()))
+                itemrect.setX(max(itemrect.x(), 0))
+                itemrect.setHeight(itemrect.height()+min(0, itemrect.y()))
+                itemrect.setY(max(itemrect.y(), 0))
+                
+                # Width of item in cells
+                itemw = math.ceil(itemrect.width()/GRIDSIZE[0])-1
+                # Height 
+                itemh = math.ceil(itemrect.height()/GRIDSIZE[1])-1
+                # Column (x) base
+                col = math.ceil((itemrect.x())/GRIDSIZE[0])
+                # Row (y) base
+                row = math.ceil((itemrect.y())/GRIDSIZE[1])
+                try:
+                    colbase = max(col, 0)
+                    rowbase = max(row, 0)
+                    for colit in range(colbase, colbase+itemw):
+                        for rowit in range(rowbase, rowbase+itemh):
+                            mat[rowit][colit] = -1
+                except IndexError as e:
+                    print(f'Index Error at {colit}, {rowit}')
+            elif isinstance(item, QGraphicsPathItem):
+                coords = gridPointsFromPath(item)
+                for coord in coords:
+                    try:
+                        mat[coord[1]][coord[0]] = 2
+                    except IndexError: pass
     return mat
 
 def pathfind(a: QPointF, b: QPointF, searchbounds, mat):
-    if searchbounds.width() == 0:
-        searchbounds.setWidth(10) 
-        searchbounds.setX(searchbounds.x()-5)
-    if searchbounds.height() == 0:
-        searchbounds.setHeight(10) 
-        searchbounds.setY(searchbounds.y()-5)
-    grid = Grid(matrix=mat)
-
-    gridOffset = (-(GRIDSIZE[0]/2), -(GRIDSIZE[1]/4))
-
-    xoffset = snapToGrid(searchbounds.width(), GRIDSIZE[0])
-    yoffset = snapToGrid(searchbounds.height(), GRIDSIZE[1])
-
-    pointACoords = (math.floor((a.x()-searchbounds.x()) /
-                    GRIDSIZE[0]), math.floor((a.y()-searchbounds.y())/GRIDSIZE[1]))
-    pointBCoords = (math.floor((b.x()-searchbounds.x()) /
-                    GRIDSIZE[0]), math.floor((b.y()-searchbounds.y())/GRIDSIZE[1]))
-
-    if a.x() < b.x() and a.y() < b.y():
-        start = grid.node(0, 0)
-        end = grid.node(len(mat[0])-1, len(mat)-1)
-
-    elif a.x() < b.x() and a.y() > b.y():
-        start = grid.node(0, len(mat)-1)
-        end = grid.node(len(mat[0])-1, 0)
-
-    elif a.x() > b.x() and a.y() < b.y():
-        start = grid.node(len(mat[0])-1, 0)
-        end = grid.node(0, len(mat)-1)
-
-    elif a.x() > b.x() and a.y() > b.y():
-        start = grid.node(len(mat[0])-1, len(mat)-1)
-        end = grid.node(0, 0)
-        
     try:
-        start = grid.node(pointACoords[0], pointACoords[1])
-    except IndexError:
+        if searchbounds.width() == 0:
+            searchbounds.setWidth(10) 
+            searchbounds.setX(searchbounds.x()-5)
+        if searchbounds.height() == 0:
+            searchbounds.setHeight(10) 
+            searchbounds.setY(searchbounds.y()-5)
+        grid = Grid(matrix=mat)
+
+        gridOffset = (-(GRIDSIZE[0]/2), -(GRIDSIZE[1]/4))
+
+
         pointACoords = (math.floor((a.x()-searchbounds.x()) /
-                        GRIDSIZE[0])-1, math.floor((a.y()-searchbounds.y())/GRIDSIZE[1]))
-        start = grid.node(pointACoords[0], pointACoords[1])
-    try:
-        end = grid.node(pointBCoords[0], pointBCoords[1])
-    except IndexError:
+                        GRIDSIZE[0]), math.floor((a.y()-searchbounds.y())/GRIDSIZE[1]))
         pointBCoords = (math.floor((b.x()-searchbounds.x()) /
-                    GRIDSIZE[0])-1, math.floor((b.y()-searchbounds.y())/GRIDSIZE[1])-1)
-        end = grid.node(pointBCoords[0], pointBCoords[1])
+                        GRIDSIZE[0]), math.floor((b.y()-searchbounds.y())/GRIDSIZE[1]))
 
-    finder = DijkstraFinder(
-        diagonal_movement=DiagonalMovement.only_when_no_obstacle)
-    path, runs = finder.find_path(start, end, grid)
-    translatedpath = []
+        if a.x() < b.x() and a.y() < b.y():
+            start = grid.node(0, 0)
+            end = grid.node(len(mat[0])-1, len(mat)-1)
 
-    for coordinate in path:
-        p = (coordinate[0]*GRIDSIZE[0]+gridOffset[0]+searchbounds.x()+Socket.PILLSIZE.width(),
-             coordinate[1]*GRIDSIZE[1]+gridOffset[1]+searchbounds.y()+Socket.PILLSIZE.height())
-        translatedpath.append(p)
-    return translatedpath
+        elif a.x() < b.x() and a.y() > b.y():
+            start = grid.node(0, len(mat)-1)
+            end = grid.node(len(mat[0])-1, 0)
 
+        elif a.x() > b.x() and a.y() < b.y():
+            start = grid.node(len(mat[0])-1, 0)
+            end = grid.node(0, len(mat)-1)
+
+        elif a.x() > b.x() and a.y() > b.y():
+            start = grid.node(len(mat[0])-1, len(mat)-1)
+            end = grid.node(0, 0)
+            
+        try:
+            start = grid.node(pointACoords[0], pointACoords[1])
+        except IndexError:
+            pointACoords = (math.floor((a.x()-searchbounds.x()) /
+                            GRIDSIZE[0])-1, math.floor((a.y()-searchbounds.y())/GRIDSIZE[1]))
+            start = grid.node(pointACoords[0], pointACoords[1])
+        try:
+            end = grid.node(pointBCoords[0], pointBCoords[1])
+        except IndexError:
+            pointBCoords = (math.floor((b.x()-searchbounds.x()) /
+                        GRIDSIZE[0])-1, math.floor((b.y()-searchbounds.y())/GRIDSIZE[1])-1)
+            end = grid.node(pointBCoords[0], pointBCoords[1])
+
+        finder = DijkstraFinder(
+            diagonal_movement=DiagonalMovement.only_when_no_obstacle)
+        path, runs = finder.find_path(start, end, grid)
+        translatedpath = []
+
+        #print(grid.grid_str(path=path, start=start, end=end))
+
+        for coordinate in path:
+            p = (coordinate[0]*GRIDSIZE[0]+gridOffset[0]+searchbounds.x()+Socket.PILLSIZE.width(),
+                coordinate[1]*GRIDSIZE[1]+gridOffset[1]+searchbounds.y()+Socket.PILLSIZE.height())
+            translatedpath.append(p)
+        return translatedpath
+        
+    except Exception:
+        return None

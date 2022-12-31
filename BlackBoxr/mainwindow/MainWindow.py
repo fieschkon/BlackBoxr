@@ -114,7 +114,11 @@ class MainWindow(QWidget):
 
         rl2 = RequirementNode(rldata)
         testDV.Scene.addItem(rl2)
-        rl.setPos(700, 400)
+        rl2.setPos(700, 400)
+
+        rl3 = RequirementNode(rldata)
+        testDV.Scene.addItem(rl3)
+        rl3.setPos(1000, 400)
 
         self.setWindowTitle(objects.qapp.applicationName())
         self.label.setText(u"Ico")
