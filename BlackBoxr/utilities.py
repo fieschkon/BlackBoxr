@@ -138,3 +138,7 @@ def printMatrix(mat : list[list]):
 
 def snapToGrid(val, base):
     return base * round(val/base)
+
+def transpose(mat):
+ 
+  return [*zip(*mat)]

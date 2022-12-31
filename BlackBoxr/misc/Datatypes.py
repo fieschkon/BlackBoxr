@@ -19,7 +19,7 @@ from PySide6.QtCore import QPointF
 from datetime import datetime
 import json
 
-from BlackBoxr.utilities import first, getDuration
+from BlackBoxr.utilities import first, getDuration, randomString
 from BlackBoxr.misc.objects import datadir, tmpdir, systems
 import BlackBoxr.misc.configuration as configuration
 
@@ -284,6 +284,18 @@ class RequirementElement(Element):
         e.upstream          = inDict["upstream"]  
         e.downstream        = inDict["downstream"]
         return copy.deepcopy(e)
+
+    @staticmethod
+    def random(insys = None):
+        e = RequirementElement(insys)
+        e.public = {
+            'name' : randomString(),
+            'requirement' : randomString(),
+            'Rationale' : randomString(),
+            'Metric' : randomString()
+        }
+        return e
+
 
     def __init__(self, owningSystem : System = None) -> None:
         super().__init__(owningSystem)

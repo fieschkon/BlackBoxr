@@ -338,6 +338,10 @@ class RequirementNode(NodeBase):
         self.hoverEnterEvent(None)
         self.hoverLeaveEvent(None)
 
+    def connectDownstream(self, item):
+        if isinstance(item, RequirementNode):
+            self.bottomSocket.connectTo(item.topSocket)
+
 class ExternalConnections(DesignNode):
     def __init__(self, bbox, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -439,6 +443,13 @@ class Socket(QGraphicsItem):
                     self.setSelected(True)
             except IndexError:
                 pass
+
+    def connectTo(self, targetSocket):
+        if isinstance(targetSocket, Socket) and isinstance(self.parentNode, RequirementNode):
+            t = ArrowItem(source=self, destination=targetSocket, parent=None)
+            self.scene().addItem(t)
+            self.connectTrace(t)
+            self.parentNode.ownedRL.addDownstream(targetSocket.parentNode.ownedRL)
 
     def connectTrace(self, trace):
             self.traces.append(trace)

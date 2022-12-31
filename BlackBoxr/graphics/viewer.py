@@ -15,13 +15,14 @@ from PySide6.QtGui import QTransform, QPixmap, QAction, QPainter, QColor, QPen, 
 
 from BlackBoxr.misc import configuration, objects
 from BlackBoxr.misc.Datatypes import MoveCommand, NameEdit
-from BlackBoxr.utilities import closestPoint, printMatrix
+from BlackBoxr.utilities import closestPoint, printMatrix, transpose
 
 from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
 
-from igraph import Graph, EdgeSeq
+import igraph as ig
+from igraph import Graph, EdgeSeq, plot
 
 GRIDSIZE = (25, 25)
 ENDOFFSET = -QPointF(25, 25)
@@ -147,23 +148,40 @@ class DiagramScene(QGraphicsScene):
         testuuid = ""
         reqnodes = [itemiter for itemiter in self.items(
         ) if itemiter.__class__.__name__ == 'RequirementNode']
+        root = g.add_vertex('root')
         for item in reqnodes:
             g.add_vertex(str(item.ownedRL.uuid))
-            testuuid = str(item.ownedRL.uuid)
+            if len(item.ownedRL.upstream) == 0:
+                g.add_edge('root', str(item.ownedRL.uuid))
         for item in reqnodes:
             for downstreamitem in item.getDownstreamItems():
                 g.add_edge(str(item.ownedRL.uuid), str(
                     downstreamitem.ownedRL.uuid))
 
-        # Sort diagramitems by top to bottom
-
-        # Our chosen root:
-        root = 0
-        layout = g.layout("rt", root)
+        
+        #layout = g.layout_sugiyama()
+        #g.layout("rt")
         offset = QPointF(0, 0)
         named_vertex_list = g.vs["name"]
-
+        
         lookup = {}
+
+        # Distances from the root, will be used for ordering:
+        dist=g.shortest_paths(source='root')[0]
+
+        def ordering(elems):
+            return sorted(range(len(elems)), key=elems.__getitem__)
+
+        # Compute orderings based on the distance from the root:
+        perm = ordering(dist)
+        invperm = ordering(perm)
+
+        # Reorder, direct, restore order:
+        dg = g.permute_vertices(invperm)
+        dg.to_directed('acyclic')
+        dg : Graph = dg.permute_vertices(perm)
+
+        layout = dg.layout_reingold_tilford(root=root.index)
 
         '''for i, it in enumerate(named_vertex_list):
             it = self.searchByUUID(it)
@@ -175,22 +193,25 @@ class DiagramScene(QGraphicsScene):
 
         # Capture original and ideal positions
         for i, vertex in enumerate(named_vertex_list):
-            item = self.searchByUUID(vertex)
+            if vertex != 'root':
+                item = self.searchByUUID(vertex)
+                #g.vs['name'].index(vertex)
+                #print(named_vertex_list.index(vertex))
+                
+                idealX = layout.coords[i][0] * (380 * math.log(len(layout.coords)))
+                idealY = layout.coords[i][1] * (480 * len(layout.coords[0]))
 
-            idealX = layout.coords[i][0] * (380 * math.log(len(layout.coords)))
-            idealY = layout.coords[i][1] * (480 * len(layout.coords[0]))
-
-            lookup[vertex] = {
-                'ideal':             {
-                    'x': idealX,
-                    'y': idealY
-                },
-                'original':             {
-                    'x': item.x(),
-                    'y': item.y()
-                },
-            }
-            item.setPos(idealX, idealY)
+                lookup[vertex] = {
+                    'ideal':             {
+                        'x': idealX,
+                        'y': idealY
+                    },
+                    'original':             {
+                        'x': item.x(),
+                        'y': item.y()
+                    },
+                }
+                item.setPos(idealX, idealY)
 
 
         # Calculate Midpoint
@@ -212,7 +233,7 @@ class DiagramScene(QGraphicsScene):
             item = self.searchByUUID(key)
             item.moveTo(QPointF(value['ideal']['x']+offset.x(), value['ideal']['y']+offset.y()))
 
-
+        #plot(dg, layout=layout)
 
     def requestRepaintTraces(self):
         reqnodes = [itemiter for itemiter in self.items(
@@ -220,6 +241,7 @@ class DiagramScene(QGraphicsScene):
         for node in reqnodes:
             node.repaintTraces()
         self.update()
+        self.views()[0].repaint()
 
     ''' Mouse Interactions '''
 
