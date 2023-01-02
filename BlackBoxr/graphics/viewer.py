@@ -11,11 +11,11 @@ from PySide6.QtWidgets import (
 from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import Qt, QRectF, QRect, QPointF, QVariantAnimation, QEasingCurve, QLineF, QPoint, Signal
 from PySide6 import QtGui
-from PySide6.QtGui import QTransform, QPixmap, QAction, QPainter, QColor, QPen, QBrush, QCursor, QPainterPath, QFont, QFontMetrics, QUndoStack, QKeySequence, QWheelEvent
+from PySide6.QtGui import QTransform, QClipboard, QPixmap, QAction, QPainter, QColor, QPen, QBrush, QCursor, QPainterPath, QFont, QFontMetrics, QUndoStack, QKeySequence, QWheelEvent
 
 from BlackBoxr.misc import configuration, objects
 from BlackBoxr.misc.Datatypes import MoveCommand, NameEdit
-from BlackBoxr.utilities import closestPoint, printMatrix, transpose
+from BlackBoxr.utilities import closestPoint, printMatrix, snapToGrid, transpose
 
 from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
@@ -40,6 +40,8 @@ class DiagramViewer(QGraphicsView):
 
         self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
         self.setViewportUpdateMode(QGraphicsView.FullViewportUpdate)
+
+        
 
     ''' Item Focusing '''
 
@@ -100,15 +102,22 @@ class DiagramViewer(QGraphicsView):
     def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
         if objects.qapp.keyboardModifiers() == (Qt.ControlModifier | Qt.AltModifier) and event.key() == Qt.Key_F:
             self._scene.formatRequirements()
+        elif objects.qapp.keyboardModifiers() == (Qt.ControlModifier) and event.key() == Qt.Key_C:
+            bounds = self._scene.buildBoundingRectFromSelectedItems()
+            print(bounds)
+            self._scene.saveImage(bounds)
         return super().keyPressEvent(event)
 
 
 class DiagramScene(QGraphicsScene):
 
+    formatFinished = Signal()
+
     def __init__(self):
         super().__init__()
 
         self._dragged = False
+        self.moveditems = 0
         # self.setBackgroundBrush(configuration.GridColor)
 
     def set_viewer(self, viewer):
@@ -144,23 +153,24 @@ class DiagramScene(QGraphicsScene):
         return hit
 
     def formatRequirements(self):
-        g = Graph()
+        g = Graph(directed=True)
         testuuid = ""
         reqnodes = [itemiter for itemiter in self.items(
         ) if itemiter.__class__.__name__ == 'RequirementNode']
         root = g.add_vertex('root')
         for item in reqnodes:
-            g.add_vertex(str(item.ownedRL.uuid))
+            g.add_vertex(str(item.ownedRL.uuid), label=str(item.ownedRL.uuid))
             if len(item.ownedRL.upstream) == 0:
                 g.add_edge('root', str(item.ownedRL.uuid))
         for item in reqnodes:
-            for downstreamitem in item.getDownstreamItems():
-                g.add_edge(str(item.ownedRL.uuid), str(
-                    downstreamitem.ownedRL.uuid))
+            for downstreamitem in item.ownedRL.downstream:
+                g.add_edge(str(item.ownedRL.uuid), downstreamitem)
+                print(f'Adding {downstreamitem} downstream of {str(item.ownedRL.uuid)}')
 
         
         #layout = g.layout_sugiyama()
         #g.layout("rt")
+
         offset = QPointF(0, 0)
         named_vertex_list = g.vs["name"]
         
@@ -181,25 +191,22 @@ class DiagramScene(QGraphicsScene):
         dg.to_directed('acyclic')
         dg : Graph = dg.permute_vertices(perm)
 
-        layout = dg.layout_reingold_tilford(root=root.index)
-
-        '''for i, it in enumerate(named_vertex_list):
-            it = self.searchByUUID(it)
-            
-            tarx = layout.coords[i][0] * (380 * math.log(len(layout.coords)))
-            tary = layout.coords[i][1] * (480 * len(layout.coords[0]))
-            #it.moveTo(QPointF(tarx, tary))
-            it.setPos(QPointF(tarx, tary))'''
+        layout = g.layout_reingold_tilford(root=root.index)
+        #g.layout_sugiyama()
+        #dg.layout_reingold_tilford(root=root.index)
 
         # Capture original and ideal positions
+
+        #print(named_vertex_list)
+
         for i, vertex in enumerate(named_vertex_list):
             if vertex != 'root':
                 item = self.searchByUUID(vertex)
                 #g.vs['name'].index(vertex)
-                #print(named_vertex_list.index(vertex))
+                coordindex = named_vertex_list.index(vertex)
                 
-                idealX = layout.coords[i][0] * (380 * math.log(len(layout.coords)))
-                idealY = layout.coords[i][1] * (480 * len(layout.coords[0]))
+                idealX = layout.coords[coordindex][0] * (380 * math.log(len(layout.coords)))
+                idealY = layout.coords[coordindex][1] * (480 * len(layout.coords[0]))
 
                 lookup[vertex] = {
                     'ideal':             {
@@ -211,29 +218,34 @@ class DiagramScene(QGraphicsScene):
                         'y': item.y()
                     },
                 }
-                item.setPos(idealX, idealY)
-
-
-        # Calculate Midpoint
         itemsbbox = self.itemsBoundingRect()
-        scenebbox = self.sceneRect()
-        offset.setX((scenebbox.width()/2)-(itemsbbox.width()/2))
-        offset.setY((scenebbox.height()/2)-(itemsbbox.height()/2))
-
-        # Restore position
-        for key, value in lookup.items():
-            item = self.searchByUUID(key)
-            item.setPos(value['original']['x'], value['original']['y'])
-
-        self.views()[0].moveTo(
-            QPointF((scenebbox.width()/2), (scenebbox.height()/2)))
-
+        view = self.views()[0]
+        offsetrect = view.mapToScene(view.viewport().geometry()).boundingRect()
+        offset.setX(offsetrect.x()+offsetrect.width()/2)
+        offset.setY(offsetrect.y()+offsetrect.height()/2-itemsbbox.height()/2)
+        
         # Animate move to new point
         for key, value in lookup.items():
             item = self.searchByUUID(key)
             item.moveTo(QPointF(value['ideal']['x']+offset.x(), value['ideal']['y']+offset.y()))
+            item.moveFinishedNotifier = self.moveIterator
 
-        #plot(dg, layout=layout)
+
+        plot(g, layout=layout)
+
+    def moveIterator(self):
+        self.moveditems += 1
+        requirementsItems = [itemiter for itemiter in self.items() if itemiter.__class__.__name__ == 'RequirementNode']
+        numberofitems = len(requirementsItems)
+        if self.moveditems == numberofitems:
+            self.moveditems = 0
+            self.formatFinished.emit()
+            self.views()[0].repaint()
+            self.update()
+            for item in requirementsItems:
+                item.itemChange(QGraphicsItem.GraphicsItemChange.ItemPositionChange, item.scenePos())
+            
+            
 
     def requestRepaintTraces(self):
         reqnodes = [itemiter for itemiter in self.items(
@@ -250,3 +262,15 @@ class DiagramScene(QGraphicsScene):
 
     def dragMoveEvent(self, QGraphicsSceneDragDropEvent):
         QGraphicsSceneDragDropEvent.accept()
+
+    def buildBoundingRectFromSelectedItems(self):
+        sourcerect = QRect(0,0,0,0)
+        for item in self.selectedItems():
+            sourcerect = sourcerect.united(item.sceneBoundingRect().toRect())
+        return sourcerect
+
+    def saveImage(self, bounds : QRectF):
+        pxmap = QPixmap(self.views()[0].grab(bounds))
+        objects.qapp.clipboard().setPixmap(pxmap)
+        print(f'Saving to {objects.tmpdir + "/boink.png"}')
+        pxmap.save(objects.tmpdir + '/boink.png')
