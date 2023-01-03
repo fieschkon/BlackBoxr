@@ -439,7 +439,7 @@ class Socket(QGraphicsItem):
                     self.setSelected(False)
                     if isinstance(self.parentNode, RequirementNode) and isinstance(selectedItem.parentNode, RequirementNode):
                         selectedItem.parentNode.ownedRL.addDownstream(self.parentNode.ownedRL)
-
+                    self.trace = None
                 elif objects.qapp.keyboardModifiers() == Qt.AltModifier:
                     self.scene().removeItem(self.trace)
                     self.disconnectAll()
@@ -449,7 +449,7 @@ class Socket(QGraphicsItem):
                         item.setSelected(False)
                     self.setSelected(True)
             except IndexError:
-                pass
+                self.setSelected(True)
 
     def connectTo(self, targetSocket):
         if isinstance(targetSocket, Socket) and isinstance(self.parentNode, RequirementNode):

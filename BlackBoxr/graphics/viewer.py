@@ -165,7 +165,6 @@ class DiagramScene(QGraphicsScene):
         for item in reqnodes:
             for downstreamitem in item.ownedRL.downstream:
                 g.add_edge(str(item.ownedRL.uuid), downstreamitem)
-                print(f'Adding {downstreamitem} downstream of {str(item.ownedRL.uuid)}')
 
         
         #layout = g.layout_sugiyama()
@@ -231,7 +230,7 @@ class DiagramScene(QGraphicsScene):
             item.moveFinishedNotifier = self.moveIterator
 
 
-        plot(g, layout=layout)
+        #plot(g, layout=layout)
 
     def moveIterator(self):
         self.moveditems += 1
