@@ -269,6 +269,9 @@ class RequirementNode(NodeBase):
     def __init__(self, RL: RequirementElement, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.ownedRL = RL
+
+        self.ownedRL.subscribe(self.onRLUpdate)
+
         self.proxy = QGraphicsProxyWidget(self)
         self.lbl = DisplayItem(self.ownedRL)
         self.proxy.setWidget(self.lbl)
@@ -277,6 +280,9 @@ class RequirementNode(NodeBase):
         self.bottomSocket = Socket(self, None, vertical=True, type=Socket.IOTYPE.OUT)
 
         self.moveFinishedNotifier = None
+
+    def onRLUpdate(self):
+        self.lbl
 
     def boundingRect(self):
         proxysize = self.proxy.size()

@@ -636,10 +636,10 @@ class GlobalSettingsDialog(QDialog):
         self.gridLayout = QGridLayout()
         self.gridLayout.setObjectName(u"gridLayout")
         self.gridLayout.setContentsMargins(-1, 10, -1, -1)
-        self.label_2 = QLabel(self.scrollAreaWidgetContents)
-        self.label_2.setObjectName(u"label_2")
+        self.themelabel = QLabel(self.scrollAreaWidgetContents)
+        self.themelabel.setObjectName(u"label_2")
 
-        self.gridLayout.addWidget(self.label_2, 1, 0, 1, 1)
+        self.gridLayout.addWidget(self.themelabel, 1, 0, 1, 1)
 
         self.appThemeSelectBox = QComboBox(self.scrollAreaWidgetContents)
         self.appThemeSelectBox.addItems(qdarktheme.get_themes())
@@ -648,10 +648,10 @@ class GlobalSettingsDialog(QDialog):
 
         self.gridLayout.addWidget(self.appThemeSelectBox, 1, 1, 1, 1)
 
-        self.label = QLabel(self.scrollAreaWidgetContents)
-        self.label.setObjectName(u"label")
+        self.namingstylelabel = QLabel(self.scrollAreaWidgetContents)
+        self.namingstylelabel.setObjectName(u"label")
 
-        self.gridLayout.addWidget(self.label, 0, 0, 1, 1)
+        self.gridLayout.addWidget(self.namingstylelabel, 0, 0, 1, 1)
 
         self.namingStyleSelectBox = QComboBox(self.scrollAreaWidgetContents)
         self.namingStyleSelectBox.addItem("")
@@ -660,21 +660,33 @@ class GlobalSettingsDialog(QDialog):
 
         self.gridLayout.addWidget(self.namingStyleSelectBox, 0, 1, 1, 1)
 
+        self.copystylelabel = QLabel(self.scrollAreaWidgetContents)
+        self.copystylelabel.setObjectName(u"label_6")
+
+        self.gridLayout.addWidget(self.copystylelabel, 2, 0, 1, 1)
+
+        self.copystyleSelectBox = QComboBox(self.scrollAreaWidgetContents)
+        self.copystyleSelectBox.addItem("")
+        self.copystyleSelectBox.addItem("")
+        self.copystyleSelectBox.addItem("")
+        self.copystyleSelectBox.setObjectName(u"namingStyleSelectBox")
+
+        self.gridLayout.addWidget(self.copystyleSelectBox, 2, 1, 1, 1)
 
         self.verticalLayout_2.addLayout(self.gridLayout)
 
-        self.label_3 = QLabel(self.scrollAreaWidgetContents)
-        self.label_3.setObjectName(u"label_3")
+        self.fontsettingslabel = QLabel(self.scrollAreaWidgetContents)
+        self.fontsettingslabel.setObjectName(u"label_3")
 
-        self.verticalLayout_2.addWidget(self.label_3)
+        self.verticalLayout_2.addWidget(self.fontsettingslabel)
 
         self.gridLayout_2 = QGridLayout()
         self.gridLayout_2.setObjectName(u"gridLayout_2")
         self.gridLayout_2.setContentsMargins(-1, 10, -1, -1)
-        self.label_4 = QLabel(self.scrollAreaWidgetContents)
-        self.label_4.setObjectName(u"label_4")
+        self.titlesizelabel = QLabel(self.scrollAreaWidgetContents)
+        self.titlesizelabel.setObjectName(u"label_4")
 
-        self.gridLayout_2.addWidget(self.label_4, 0, 0, 1, 1)
+        self.gridLayout_2.addWidget(self.titlesizelabel, 0, 0, 1, 1)
 
         self.lineEdit = QLineEdit(self.scrollAreaWidgetContents)
         self.lineEdit.setObjectName(u"lineEdit")
@@ -682,11 +694,11 @@ class GlobalSettingsDialog(QDialog):
 
         self.gridLayout_2.addWidget(self.lineEdit, 0, 1, 1, 1)
 
-        self.label_5 = QLabel(self.scrollAreaWidgetContents)
-        self.label_5.setObjectName(u"label_5")
-        self.label_5.setMaximumSize(QSize(20, 16777215))
+        self.ptlabel = QLabel(self.scrollAreaWidgetContents)
+        self.ptlabel.setObjectName(u"label_5")
+        self.ptlabel.setMaximumSize(QSize(20, 16777215))
 
-        self.gridLayout_2.addWidget(self.label_5, 0, 2, 1, 1)
+        self.gridLayout_2.addWidget(self.ptlabel, 0, 2, 1, 1)
 
 
         self.verticalLayout_2.addLayout(self.gridLayout_2)
@@ -711,16 +723,21 @@ class GlobalSettingsDialog(QDialog):
         self.buttonBox.rejected.connect(self.reject)
 
         self.setWindowTitle("Global Settings")
-        self.label_2.setText("Theme")
+        self.themelabel.setText("Theme")
 
-        self.label.setText("Default Naming Style:")
+        self.namingstylelabel.setText("Default Naming Style:")
         self.namingStyleSelectBox.setItemText(0, u"By UUID")
         self.namingStyleSelectBox.setItemText(1, u"By Name")
 
-        self.label_3.setText(u"Font Settings")
-        self.label_4.setText(u"Title Size")
+        self.fontsettingslabel.setText(u"Font Settings")
+        self.titlesizelabel.setText(u"Title Size")
         self.lineEdit.setText(u"16")
-        self.label_5.setText(u"pt")
+        self.ptlabel.setText(u"pt")
+
+        self.copystylelabel.setText(u"Copy Style")
+        self.copystyleSelectBox.setItemText(0, u"None")
+        self.copystyleSelectBox.setItemText(1, u"Duplicate")
+        self.copystyleSelectBox.setItemText(2, u"Reference")
 
         self.scrollAreaWidgetContents.resize(self.scrollArea.minimumSizeHint())
         self.scrollArea.resize(self.scrollArea.minimumSizeHint())
@@ -729,7 +746,8 @@ class GlobalSettingsDialog(QDialog):
     def loadSettings(self):
         self.appThemeSelectBox.setCurrentIndex(self.appThemeSelectBox.findText(configuration.themename))
         self.namingStyleSelectBox.setCurrentIndex(self.namingStyleSelectBox.findText(configuration.namingstyle))
-    
+        self.copystyleSelectBox.setCurrentIndex(self.copystyleSelectBox.findText(configuration.copypreference))
+
     def saveSettings(self):
         configuration.globalSettingsSizeX = self.size().width()
         configuration.globalSettingsSizeY = self.size().height()
@@ -739,6 +757,7 @@ class GlobalSettingsDialog(QDialog):
         super().accept()
         configuration.themename = self.appThemeSelectBox.currentText()
         configuration.namingstyle = self.namingStyleSelectBox.currentText()
+        configuration.copypreference = self.copystyleSelectBox.currentText()
         self.saveSettings()
 
     def reject(self) -> None:
@@ -940,7 +959,7 @@ class DisplayItem(QWidget):
         super().__init__(parent)
         self.resize(380, 480)
         self.ownedItem = item
-        self.fieldAreas : list[ExpandableLineEdit] = []
+        self.fieldAreas : dict = {}
         self.setupUI()
         self.createFields()
 
@@ -972,10 +991,14 @@ class DisplayItem(QWidget):
 
     def createFields(self):
         for i, (key, value) in enumerate(self.ownedItem.public.items()):
-            self.fieldAreas.append(FieldWidget(key, self.scrollAreaContents))
-            self.fieldAreas[-1].setText(value)
-            self.fieldAreas[-1].edited.connect(lambda title, content : self.itemChanged(title, content))
-            self.mainLayout.addWidget(self.fieldAreas[-1])
+            self.fieldAreas[key] = FieldWidget(key, self.scrollAreaContents)
+            self.fieldAreas[key].setText(value)
+            self.fieldAreas[key].edited.connect(lambda title, content : self.itemChanged(title, content))
+            self.mainLayout.addWidget(self.fieldAreas[key])
+
+    def updateFields(self):
+        for key, value in self.ownedItem.public.items():
+            self.fieldAreas[key].setText(value)
 
 
     def itemChanged(self, key, value):

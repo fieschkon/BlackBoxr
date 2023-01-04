@@ -60,8 +60,10 @@ winy = 150
 globalSettingsSizeX = 300
 globalSettingsSizeY = 200
 
+copypreference = 'None'
+
 def loadSettings():
-    global winx, winy, themename, namingstyle, stylesheet, globalSettingsSizeX, globalSettingsSizeY
+    global winx, winy, themename, namingstyle, stylesheet, globalSettingsSizeX, globalSettingsSizeY, copypreference
 
     utilities.log('configuration.loadSettings', "Loading Settings...")
 
@@ -78,14 +80,15 @@ def loadSettings():
     themename = config['DEFAULT']['themename']
     stylesheet = qdarktheme.load_stylesheet(themename)
     namingstyle = config['DEFAULT']['namingstyle']
+    copypreference = config['DEFAULT']['copypreference']
 
 
 def saveSettings():
     if not os.path.exists(objects.configfile):
         config['DEFAULT'] = getDefaults()
     else:
-        config['DEFAULT'] = {'winx': winx, 'winy': winy, 'themename' : themename, 'namingstyle' : namingstyle, 'globalSettingsSizeX' : globalSettingsSizeX, 'globalSettingsSizeY' : globalSettingsSizeY}
+        config['DEFAULT'] = {'winx': winx, 'winy': winy, 'themename' : themename, 'namingstyle' : namingstyle, 'globalSettingsSizeX' : globalSettingsSizeX, 'globalSettingsSizeY' : globalSettingsSizeY, 'copypreference' : copypreference}
     write_file()
 
 def getDefaults() -> dict:
-    return {'winx': '200', 'winy': '150', 'themename' : 'dark', 'namingstyle' : 'By UUID', 'globalSettingsSizeX' : '300', 'globalSettingsSizeY' : '200'}
+    return {'winx': '200', 'winy': '150', 'themename' : 'dark', 'namingstyle' : 'By UUID', 'globalSettingsSizeX' : '300', 'globalSettingsSizeY' : '200', 'copypreference' : 'None'}

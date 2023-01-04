@@ -155,9 +155,16 @@ class Element():
     def fromStr(inStr : str, owningSystem : System = None):
         return Element.fromDict(json.loads(str), owningSystem)
 
+    @staticmethod
+    def copy(element):
+        return Element.fromDict(element.toDict())
+
     @abstractmethod
     def addToSystem(self):
         pass
+
+    def subscribe(self, func):
+        self.subscribelist.append(func)
 
     def __init__(self, owningSystem : System = None) -> None:
         self.owningSystem = owningSystem
@@ -172,6 +179,8 @@ class Element():
         ''' Time tracking '''
         self.createDate = self.generateCreateTime()
         self.updateDate = self.createDate
+
+        self.subscribelist = []
 
         self.addToSystem()
 
@@ -192,6 +201,8 @@ class Element():
         if hasattr(self, key):
             if key not in ['updateDate', 'initflag'] and value != self.__getattribute__(key):
                 self.updateDate = datetime.now().strftime("%m/%d/%y %H:%M:%S")
+                for func in self.subscribelist:
+                    func()
         super().__setattr__(key, value)
 
     def __repr__(self) -> str:
@@ -301,6 +312,7 @@ class RequirementElement(Element):
                 'Metric' : randomString()
             }
         return e
+
 
     def populateFromSystem(self, random = False):
         if self.owningSystem != None:

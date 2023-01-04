@@ -1,6 +1,7 @@
 from enum import Enum
 import inspect
 import math
+import os
 import random
 from types import NoneType
 import typing
@@ -166,11 +167,12 @@ class DiagramScene(QGraphicsScene):
             sourcerect = sourcerect.united(item.sceneBoundingRect().toRect())
         return sourcerect
 
-    def saveImage(self, bounds : QRectF):
-        pxmap = QPixmap(self.views()[0].grab(bounds))
+    def saveImageToClipboard(self, bounds : QRectF):
+        pxmap = QPixmap(self.views()[0].grab(self.views()[0].mapFromScene(bounds).boundingRect()))
+        
         objects.qapp.clipboard().setPixmap(pxmap)
-        print(f'Saving to {objects.tmpdir + "/boink.png"}')
-        pxmap.save(objects.tmpdir + '/boink.png')
+        '''fname = os.path.join(objects.tmpdir, 'boink.png')
+        pxmap.save(fname)'''
 
 class RequirementsScene(DiagramScene):
 
