@@ -12,9 +12,10 @@ from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import Qt, QRectF, QRect, QPointF, QVariantAnimation, QEasingCurve, QLineF, QPoint, Signal
 from PySide6 import QtGui
 from PySide6.QtGui import QTransform, QClipboard, QPixmap, QAction, QPainter, QColor, QPen, QBrush, QCursor, QPainterPath, QFont, QFontMetrics, QUndoStack, QKeySequence, QWheelEvent
+import BlackBoxr.graphics.nodes
 
 from BlackBoxr.misc import configuration, objects
-from BlackBoxr.misc.Datatypes import MoveCommand, NameEdit
+from BlackBoxr.misc.Datatypes import MoveCommand, NameEdit, RequirementElement
 from BlackBoxr.utilities import closestPoint, printMatrix, snapToGrid, transpose
 
 from pathfinding.core.diagonal_movement import DiagonalMovement
@@ -108,7 +109,6 @@ class DiagramViewer(QGraphicsView):
             self._scene.saveImage(bounds)
         return super().keyPressEvent(event)
 
-
 class DiagramScene(QGraphicsScene):
 
     formatFinished = Signal()
@@ -151,6 +151,35 @@ class DiagramScene(QGraphicsScene):
                 hit = item
                 break
         return hit
+
+    ''' Mouse Interactions '''
+
+    def dragEnterEvent(self, QGraphicsSceneDragDropEvent):
+        QGraphicsSceneDragDropEvent.accept()
+
+    def dragMoveEvent(self, QGraphicsSceneDragDropEvent):
+        QGraphicsSceneDragDropEvent.accept()
+
+    def buildBoundingRectFromSelectedItems(self):
+        sourcerect = QRect(0,0,0,0)
+        for item in self.selectedItems():
+            sourcerect = sourcerect.united(item.sceneBoundingRect().toRect())
+        return sourcerect
+
+    def saveImage(self, bounds : QRectF):
+        pxmap = QPixmap(self.views()[0].grab(bounds))
+        objects.qapp.clipboard().setPixmap(pxmap)
+        print(f'Saving to {objects.tmpdir + "/boink.png"}')
+        pxmap.save(objects.tmpdir + '/boink.png')
+
+class RequirementsScene(DiagramScene):
+
+    def __init__(self, insys = None):
+        super().__init__()
+        self.sys = insys
+
+    def contextMenuEvent(self, event: QtWidgets.QGraphicsSceneContextMenuEvent) -> None:
+        return super().contextMenuEvent(event)
 
     def formatRequirements(self):
         g = Graph(directed=True)
@@ -230,7 +259,6 @@ class DiagramScene(QGraphicsScene):
             item.moveFinishedNotifier = self.moveIterator
 
 
-        #plot(g, layout=layout)
 
     def moveIterator(self):
         self.moveditems += 1
@@ -254,22 +282,21 @@ class DiagramScene(QGraphicsScene):
         self.update()
         self.views()[0].repaint()
 
-    ''' Mouse Interactions '''
+    def createRequirement(self, at : QPointF):
+        rl = BlackBoxr.graphics.nodes.RequirementNode(RequirementElement(self.sys))
+        self.addItem(rl)
+        rl.setPos(at)
 
-    def dragEnterEvent(self, QGraphicsSceneDragDropEvent):
-        QGraphicsSceneDragDropEvent.accept()
+class RequirementsViewer(DiagramViewer):
+    def __init__(self, scene: RequirementsScene, insys = None):
+        super().__init__(scene)
+        self.reqscene = scene
+        self.sys = insys
 
-    def dragMoveEvent(self, QGraphicsSceneDragDropEvent):
-        QGraphicsSceneDragDropEvent.accept()
+    def contextMenuEvent(self, event) -> None:
+        menu = QMenu(self)
+        reqcreate = menu.addAction("Create Requirement")
+        reqcreate.triggered.connect(lambda : self.reqscene.createRequirement(self.mapToScene(event.pos())))
+        menu.exec(self.mapToGlobal(event.pos()))
+        return super().contextMenuEvent(event)
 
-    def buildBoundingRectFromSelectedItems(self):
-        sourcerect = QRect(0,0,0,0)
-        for item in self.selectedItems():
-            sourcerect = sourcerect.united(item.sceneBoundingRect().toRect())
-        return sourcerect
-
-    def saveImage(self, bounds : QRectF):
-        pxmap = QPixmap(self.views()[0].grab(bounds))
-        objects.qapp.clipboard().setPixmap(pxmap)
-        print(f'Saving to {objects.tmpdir + "/boink.png"}')
-        pxmap.save(objects.tmpdir + '/boink.png')

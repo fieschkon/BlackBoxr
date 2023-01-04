@@ -61,6 +61,8 @@ class System():
         self.RL = []
         self.TE = []
 
+        self.requiremenPublicFields = ['Name', 'Requirement', 'Rationale', 'Metric']
+
         self.name = "Default System Name"
         self.uuid = uuid.uuid4()
 
@@ -69,6 +71,7 @@ class System():
 
         if self not in systems:
             systems.append(self)
+
 
     def setName(self, name):
         self.name = copy.deepcopy(name)
@@ -288,13 +291,21 @@ class RequirementElement(Element):
     @staticmethod
     def random(insys = None):
         e = RequirementElement(insys)
-        e.public = {
-            'name' : randomString(),
-            'requirement' : randomString(),
-            'Rationale' : randomString(),
-            'Metric' : randomString()
-        }
+        if insys != None:
+            e.populateFromSystem(True)
+        else:
+            e.public = {
+                'name' : randomString(),
+                'requirement' : randomString(),
+                'Rationale' : randomString(),
+                'Metric' : randomString()
+            }
         return e
+
+    def populateFromSystem(self, random = False):
+        if self.owningSystem != None:
+            for field in self.owningSystem.requiremenPublicFields:
+                self.public[field] = randomString() if random else ''
 
 
     def __init__(self, owningSystem : System = None) -> None:
@@ -302,6 +313,7 @@ class RequirementElement(Element):
         self.owningDL   = ""
         self.downstream = []
         self.upstream   = []
+        self.populateFromSystem()
 
     def addToSystem(self):
         self.owningSystem.RL.append(self)

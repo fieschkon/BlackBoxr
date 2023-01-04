@@ -14,10 +14,9 @@ from PySide6.QtCore import QModelIndex, QRect, QSize, Qt
 from PySide6.QtGui import QAction, QPen, QColor, QPainter, QKeySequence, QUndoStack, QFont
 from pip import main
 import BlackBoxr
-from BlackBoxr.graphics.viewer import DiagramScene, DiagramViewer
 from BlackBoxr.graphics.nodes import  DesignNode, NodeBase, RequirementNode, Socket
 from BlackBoxr.mainwindow.dashboard.home import Dashboard, SystemRepresenter
-from BlackBoxr.mainwindow.widgets import DesignView, DetachableTabWidget, GlobalSettingsDialog
+from BlackBoxr.mainwindow.widgets import DesignView, DetachableTabWidget, GlobalSettingsDialog, RequirementsView
 from BlackBoxr.misc import configuration, objects, Datatypes
 
 class MainWindow(QWidget):
@@ -96,26 +95,24 @@ class MainWindow(QWidget):
         self.mainTabbedWidget.addTab(objects.dashboard, "Dashboard")
 
         testsys = Datatypes.System()
-        testDV = DesignView(None, self)
+        testDV = RequirementsView(testsys, self)
         self.mainTabbedWidget.addTab(testDV, "Test Canvas")
 
-        testSys = Datatypes.System()
-
         # Tree 1
-        rl = RequirementNode(Datatypes.RequirementElement.random(testSys))
+        rl = RequirementNode(Datatypes.RequirementElement.random(testsys))
         testDV.Scene.addItem(rl)
         testDV.Viewer.centerOn(rl)
         rl.setPos(300, 400)
 
-        rl2 = RequirementNode(Datatypes.RequirementElement.random(testSys))
+        rl2 = RequirementNode(Datatypes.RequirementElement.random(testsys))
         testDV.Scene.addItem(rl2)
         rl2.setPos(700, 400)
 
-        rl3 = RequirementNode(Datatypes.RequirementElement.random(testSys))
+        rl3 = RequirementNode(Datatypes.RequirementElement.random(testsys))
         testDV.Scene.addItem(rl3)
         rl3.setPos(1000, 400)
 
-        rl4 = RequirementNode(Datatypes.RequirementElement.random(testSys))
+        rl4 = RequirementNode(Datatypes.RequirementElement.random(testsys))
         testDV.Scene.addItem(rl4)
         rl4.setPos(1000, 400)
 
@@ -125,7 +122,7 @@ class MainWindow(QWidget):
 
         # Tree 2
 
-        tree2root = RequirementNode(Datatypes.RequirementElement.random(testSys))
+        tree2root = RequirementNode(Datatypes.RequirementElement.random(testsys))
         testDV.Scene.addItem(tree2root)
         testDV.Viewer.centerOn(tree2root)
         tree2root.setPos(300, 400)
@@ -179,23 +176,3 @@ class SysDesign(QTabWidget):
         self.setTabsClosable(True)
         self.tabCloseRequested.connect(self.removeTab)
 
-
-class testScene(QWidget):
-    
-    def __init__(self) -> None:
-        super().__init__()
-        self.verticalLayout_2 = QVBoxLayout(self)
-        self.scene = DiagramScene()
-        self.view = DiagramViewer(self.scene)
-        self.scene.set_viewer(self.view)
-        self.verticalLayout_2.addWidget(self.view)
-        self.setLayout(self.verticalLayout_2)
-
-        size = (120000, 120000)
-        self.scene.setSceneRect(0,0,size[0],size[1])
-
-        xoffset = size[0] / 2
-        yoffset = size[1] / 2
-
-
-        self.view.centerOn(xoffset,yoffset)

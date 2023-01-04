@@ -7,7 +7,7 @@ from PySide6.QtGui import QFont, QFontMetrics, QTextCursor, QPainter, QPen, QPai
 from PySide6.QtCore import Signal, Slot, QRect, QSize, Qt
 from PySide6 import QtCore, QtGui, QtWidgets
 from BlackBoxr import utilities
-from BlackBoxr.graphics.viewer import DiagramScene, DiagramViewer
+from BlackBoxr.graphics.viewer import DiagramScene, DiagramViewer, RequirementsScene, RequirementsViewer
 
 from BlackBoxr.misc import configuration, objects
 from PySide6.QtCharts import QChart, QChartView, QPieSeries
@@ -888,11 +888,9 @@ class GenericCanvasView(QWidget):
 
         self.horizontalLayout.addWidget(self.ElementTree)
 
-        self.Scene = DiagramScene()
-        self.Viewer = DiagramViewer(self.Scene)
-        self.Viewer.setObjectName(u"Viewer")
-
-        self.horizontalLayout.addWidget(self.Viewer)
+        self.Scene : DiagramScene = None
+        self.Viewer : DiagramViewer = None
+        
 
 class DesignView(GenericCanvasView):
 
@@ -924,6 +922,18 @@ class DesignView(GenericCanvasView):
             system : System
             self.toplevelDLs = QTreeWidgetItem(self.toplevelSystems)
             self.toplevelDLs.setText(0, system.name)
+
+class RequirementsView(GenericCanvasView):
+    def __init__(self, source: System, parent: Optional[QtWidgets.QWidget]) -> None:
+        super().__init__(source, parent)
+        self.insys = source
+        self.Scene = RequirementsScene(source)
+        self.Viewer = RequirementsViewer(self.Scene, source)
+
+        self.horizontalLayout.addWidget(self.Viewer)
+
+        self.Scene.setSceneRect(0,0,50000,50000)
+        self.Viewer.centerOn(25000, 25000)
                 
 class DisplayItem(QWidget):
     def __init__(self, item : Element, parent: Optional[QtWidgets.QWidget] = None) -> None:
