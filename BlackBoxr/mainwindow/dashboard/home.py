@@ -4,7 +4,7 @@ import math
 import os
 from types import NoneType
 from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
-    QMetaObject, QObject, QPoint, QRect,
+    QMetaObject, QObject, QPoint, QRect, QFileSystemWatcher,
     QSize, QTime, QUrl, Qt)
 from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon, QResizeEvent,
@@ -158,12 +158,26 @@ class SystemRepresenter(QWidget):
             painter = QPainter(self)
             painter.setBrush(configuration.palette.color(configuration.palette.AlternateBase))
             painter.drawRoundedRect(self.rect().adjusted(0,0,-1,-1), 15, 15)'''
-        
+
+
 class Dashboard(QWidget):
     def __init__(self, parent = None) -> None:
         super().__init__(parent)
         self.setupUI(parent)
         self.systemReppers = []
+        self.discoverSystems()
+
+        self.observer = QFileSystemWatcher(self)
+        for path in objects.searchdirs:
+            print(f'Watching dir {path}')
+            self.observer.addPath(path)
+        self.observer.fileChanged.connect(lambda : self.repopulateSystems())
+        self.observer.directoryChanged.connect(lambda : self.repopulateSystems())
+
+    def repopulateSystems(self):
+        self.systemReppers.clear()
+        self.gridlist.clear()
+
         self.discoverSystems()
 
     def discoverSystems(self):

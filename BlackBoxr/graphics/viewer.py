@@ -35,11 +35,12 @@ class DiagramViewer(QGraphicsView):
 
     newVisibleArea = Signal(QRectF)
 
-    def __init__(self, scene: QGraphicsScene):
+    def __init__(self, scene: QGraphicsScene, insys = None):
         super(DiagramViewer, self).__init__(scene)
         self._scene = scene
         self.startPos = None
         self.zoomlevel = 0
+        self.sys = insys
         self.setAcceptDrops(True)
 
         self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
@@ -112,14 +113,17 @@ class DiagramViewer(QGraphicsView):
             bounds = self._scene.buildBoundingRectFromSelectedItems()
             self._scene.saveItemsForCopy()
             self._scene.saveImageToClipboard(bounds)
+        elif objects.qapp.keyboardModifiers() == Qt.ControlModifier and event.key() == Qt.Key_S:
+            self.sys.save()
         return super().keyPressEvent(event)
 
 class DiagramScene(QGraphicsScene):
 
     formatFinished = Signal()
 
-    def __init__(self):
+    def __init__(self, insys = None):
         super().__init__()
+        self.sys = insys
 
         self._dragged = False
         self.moveditems = 0
@@ -185,9 +189,8 @@ class DiagramScene(QGraphicsScene):
 
 class RequirementsScene(DiagramScene):
 
-    def __init__(self, insys = None):
-        super().__init__()
-        self.sys = insys
+    def __init__(self, insys=None):
+        super().__init__(insys)
 
     def contextMenuEvent(self, event: QtWidgets.QGraphicsSceneContextMenuEvent) -> None:
         return super().contextMenuEvent(event)
@@ -302,10 +305,9 @@ class RequirementsScene(DiagramScene):
         rl.setPos(at)
 
 class RequirementsViewer(DiagramViewer):
-    def __init__(self, scene: RequirementsScene, insys = None):
-        super().__init__(scene)
+    def __init__(self, scene: QGraphicsScene, insys=None):
+        super().__init__(scene, insys)
         self.reqscene = scene
-        self.sys = insys
 
     def contextMenuEvent(self, event) -> None:
         menu = QMenu(self)
