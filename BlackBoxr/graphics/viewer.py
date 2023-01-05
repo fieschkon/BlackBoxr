@@ -1,3 +1,4 @@
+from abc import abstractmethod
 from enum import Enum
 import inspect
 import math
@@ -106,8 +107,8 @@ class DiagramViewer(QGraphicsView):
             self._scene.formatRequirements()
         elif objects.qapp.keyboardModifiers() == (Qt.ControlModifier) and event.key() == Qt.Key_C:
             bounds = self._scene.buildBoundingRectFromSelectedItems()
-            print(bounds)
-            self._scene.saveImage(bounds)
+            self._scene.saveItemsForCopy()
+            self._scene.saveImageToClipboard(bounds)
         return super().keyPressEvent(event)
 
 class DiagramScene(QGraphicsScene):
@@ -167,7 +168,12 @@ class DiagramScene(QGraphicsScene):
             sourcerect = sourcerect.united(item.sceneBoundingRect().toRect())
         return sourcerect
 
+    @abstractmethod
+    def saveItemsForCopy(self):
+        pass
+
     def saveImageToClipboard(self, bounds : QRectF):
+        
         pxmap = QPixmap(self.views()[0].grab(self.views()[0].mapFromScene(bounds).boundingRect()))
         
         objects.qapp.clipboard().setPixmap(pxmap)
@@ -260,7 +266,10 @@ class RequirementsScene(DiagramScene):
             item.moveTo(QPointF(value['ideal']['x']+offset.x(), value['ideal']['y']+offset.y()))
             item.moveFinishedNotifier = self.moveIterator
 
-
+    def saveItemsForCopy(self):
+        objects.copiedItems.clear()
+        for item in self.selectedItems():
+            objects.copiedItems.append(item.ownedRL)
 
     def moveIterator(self):
         self.moveditems += 1

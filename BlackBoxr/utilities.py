@@ -137,8 +137,14 @@ def printMatrix(mat : list[list]):
     print(row)
 
 def snapToGrid(val, base):
+  if isinstance(val, QPointF):
+    return QPointF(snapToGrid(val.x(), base), snapToGrid(val.y(), base))
+  else:
     return base * round(val/base)
 
 def transpose(mat):
  
   return [*zip(*mat)]
+
+def lerp(pointA : QPointF, pointB : QPointF, percent : float):
+  return pointA + (percent*(pointB - pointA))

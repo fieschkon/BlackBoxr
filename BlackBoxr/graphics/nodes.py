@@ -16,6 +16,7 @@ from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import Qt, QRectF, QRect, QPointF, QVariantAnimation, QEasingCurve, QLineF, QPoint, QRunnable, Signal, QThreadPool, QObject, Slot, QThread
 from PySide6 import QtGui
 from PySide6.QtGui import QTransform, QPixmap, QAction, QPainter, QColor, QPen, QBrush, QCursor, QPainterPath, QFont, QFontMetrics, QUndoStack, QKeySequence, QWheelEvent
+from BlackBoxr import utilities
 
 from BlackBoxr.mainwindow.widgets import DisplayItem, EditableLabel, ExpandableLineEdit, Label
 from BlackBoxr.misc import configuration, objects
@@ -25,6 +26,8 @@ from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
 from pathfinding.finder.dijkstra import DijkstraFinder
+
+import asyncio
 
 GRIDSIZE = (25, 25)
 ENDOFFSET = -QPointF(25, 25)
@@ -599,6 +602,23 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
         return super().itemChange(change, value)
 
     def directPath(self):
+        if isinstance(self._sourcePoint, QGraphicsItem):
+            s = self.mapFromParent(self._sourcePoint.scenePos())
+        else:
+            s = self._sourcePoint
+        if isinstance(self._destinationPoint, QGraphicsItem):
+            d = self.mapFromParent(self._destinationPoint.scenePos())
+        else:
+            d = self._destinationPoint
+
+        path = QtGui.QPainterPath(s)
+        for percentage in (x * 0.05 for x in range(0, 20)):
+            p = utilities.snapToGrid(utilities.lerp(s, d, percentage), GRIDSIZE[0]*2)
+            path.lineTo(p)
+        path.lineTo(d)
+        return path  
+
+    def smartPath(self):
         ignoreditems = []
         if isinstance(self._sourcePoint, QGraphicsItem):
             s = self.mapFromParent(self._sourcePoint.scenePos())
@@ -626,7 +646,9 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
             self.worker = PathingThread(self.updatePath, self.mapToScene(s), self.mapToScene(d), searchbounds, mat) # Any other args, kwargs are passed to the run function
             self.worker.start()'''
             
-        self.launchpather()
+        #self.launchpather()
+        asyncio.run(self.pathAllocator())
+
 
         path = QtGui.QPainterPath(s)
 
@@ -641,8 +663,13 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
         path.lineTo(d.x(), d.y())'''
 
         return path
+    
+    async def pathAllocator(self):
+        if self.worker != None:
+            self.worker.cancel()
+        self.worker = asyncio.create_task(self.launchpather())
 
-    def launchpather(self):
+    async def launchpather(self):
         ignoreditems = []
         if isinstance(self._sourcePoint, QGraphicsItem):
             s = self.mapFromParent(self._sourcePoint.scenePos())
@@ -657,11 +684,12 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
             d = self._destinationPoint
 
         searchbounds : QRectF = buildSearchBounds(self.mapToScene(s), self.mapToScene(d), self.scene())
-        if self.worker != None:
-            self.worker.terminate()
+        '''if self.worker != None:
+            self.worker.terminate()'''
         mat = generateMatrixFromScene(searchbounds, self.scene(), [self])
-        self.worker = PathingThread(self.updatePath, self.mapToScene(s), self.mapToScene(d), searchbounds, mat) # Any other args, kwargs are passed to the run function
-        self.worker.start()
+        self.nodePath = pathfind(self.mapToScene(s), self.mapToScene(d), searchbounds, mat)
+        '''self.worker = PathingThread(self.updatePath, self.mapToScene(s), self.mapToScene(d), searchbounds, mat) # Any other args, kwargs are passed to the run function
+        self.worker.start()'''
     
     def updatePath(self, nodes):
         if nodes != None:
@@ -721,6 +749,7 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
         painter.setBrush(QtCore.Qt.NoBrush)
 
         path = self.directPath()
+        #self.smartPath()
         painter.drawPath(path)
         self.setPath(path)
 
@@ -732,6 +761,7 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
 
     def refresh(self):
         self.directPath()
+        #self.smartPath()
         self.update()
 
 class PathingRunnable(QRunnable):
@@ -830,10 +860,11 @@ def generateMatrixFromScene(searchbounds : QRectF, scene: QGraphicsScene, ignore
                 
                 colbase = max(col, 0)
                 rowbase = max(row, 0)
+
                 for colit in range(colbase, colbase+itemw):
                     for rowit in range(rowbase, rowbase+itemh):
                         try:
-                            mat[rowit][colit] = -1
+                            mat[rowit][colit] = 3
                         except IndexError as e:
                             pass
             elif isinstance(item, QGraphicsPathItem):

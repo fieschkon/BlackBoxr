@@ -20,6 +20,8 @@ configfile = "{}/config.ini".format(configdir)
 
 systems = []
 
+copiedItems = []
+
 ### Directory Data ###
 
 datadir = user_data_dir(AppName, Org)
