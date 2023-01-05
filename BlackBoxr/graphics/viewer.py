@@ -39,6 +39,7 @@ class DiagramViewer(QGraphicsView):
         super(DiagramViewer, self).__init__(scene)
         self._scene = scene
         self.startPos = None
+        self.zoomlevel = 0
         self.setAcceptDrops(True)
 
         self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
@@ -94,8 +95,10 @@ class DiagramViewer(QGraphicsView):
             self.setTransformationAnchor(QGraphicsView.AnchorUnderMouse)
             if event.angleDelta().y() > 0:
                 self.scale(1.1, 1.1)
+                self.zoomlevel += 1
             else:
                 self.scale(0.9, 0.9)
+                self.zoomlevel -= 1
         else:
             super(DiagramViewer, self).wheelEvent(event)
         self.newVisibleArea.emit(self.mapToScene(
@@ -311,3 +314,14 @@ class RequirementsViewer(DiagramViewer):
         menu.exec(self.mapToGlobal(event.pos()))
         return super().contextMenuEvent(event)
 
+    def wheelEvent(self, event: QWheelEvent, norep=False):
+        super().wheelEvent(event, norep)
+        if self.zoomlevel <= -6:
+            for item in self.items():
+                if item.__class__.__name__ == 'RequirementNode':
+                    item.lbl.setHidden(True)
+        else:
+            for item in self.items():
+                if item.__class__.__name__ == 'RequirementNode':
+                    item.lbl.setHidden(False)
+        

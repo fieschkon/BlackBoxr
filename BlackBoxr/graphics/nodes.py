@@ -27,6 +27,8 @@ from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
 from pathfinding.finder.dijkstra import DijkstraFinder
 
+import qdarktheme
+
 import asyncio
 
 GRIDSIZE = (25, 25)
@@ -278,7 +280,8 @@ class RequirementNode(NodeBase):
         self.proxy = QGraphicsProxyWidget(self)
         self.lbl = DisplayItem(self.ownedRL)
         self.proxy.setWidget(self.lbl)
-
+        
+        
         self.topSocket = Socket(self, None, vertical=True, type=Socket.IOTYPE.IN)
         self.bottomSocket = Socket(self, None, vertical=True, type=Socket.IOTYPE.OUT)
 
@@ -291,14 +294,26 @@ class RequirementNode(NodeBase):
         proxysize = self.proxy.size()
         return QRectF(0, 0, proxysize.width(), proxysize.height())
 
-    def paint(self, painter, option, widget):
+    def paint(self, painter : QPainter, option, widget):
         super().paint(painter, option, widget)
         bbox = self.boundingRect()
         # (self.boundingRect().width()/2)-(Socket.PILLSIZE.width()/2)
+
+        painter.setBrush(qdarktheme.load_palette().text().color())
+        pen = painter.pen()
+        pen.setColor(qdarktheme.load_palette().text().color())
+        pen.setCapStyle(Qt.RoundCap)
+        painter.setPen(pen)
+        font = QFont('arial', 24)
+        font.setHintingPreference(QFont.PreferNoHinting)
+        painter.setFont(font)
+        painter.drawText(self.boundingRect(), Qt.AlignCenter ,self.ownedRL.public['Requirement'])
+
         self.bottomSocket.setPos(
             (bbox.width()/2)-(Socket.PILLSIZE.width()/2), bbox.height())
         self.topSocket.setPos(
             (bbox.width()/2)-(Socket.PILLSIZE.width()/2), -Socket.PILLSIZE.width())
+        
 
     def itemChange(self, change: QtWidgets.QGraphicsItem.GraphicsItemChange, value: typing.Any) -> typing.Any:
         if change == QGraphicsItem.ItemPositionChange:
@@ -321,7 +336,7 @@ class RequirementNode(NodeBase):
         self.topSocket.flagForRepaint()
         self.bottomSocket.flagForRepaint()
         for trace in self.bottomSocket.traces + self.topSocket.traces:
-            trace.launchpather()
+            trace.directPath()
             trace.update()
             trace.show()
         if self.moveFinishedNotifier != None:
@@ -612,7 +627,7 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
             d = self._destinationPoint
 
         path = QtGui.QPainterPath(s)
-        for percentage in (x * 0.05 for x in range(0, 20)):
+        for percentage in (x * 0.1 for x in range(0, 10)):
             p = utilities.snapToGrid(utilities.lerp(s, d, percentage), GRIDSIZE[0]*2)
             path.lineTo(p)
         path.lineTo(d)
