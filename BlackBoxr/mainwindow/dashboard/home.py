@@ -5,7 +5,7 @@ import os
 from types import NoneType
 from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
     QMetaObject, QObject, QPoint, QRect, QFileSystemWatcher,
-    QSize, QTime, QUrl, Qt)
+    QSize, QTime, QUrl, Qt, Signal)
 from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon, QResizeEvent,
     QImage, QKeySequence, QLinearGradient, QPainter, QPaintEvent,
@@ -161,6 +161,9 @@ class SystemRepresenter(QWidget):
 
 
 class Dashboard(QWidget):
+
+    requestSystemOpened = Signal(System)
+
     def __init__(self, parent = None) -> None:
         super().__init__(parent)
         self.setupUI(parent)
@@ -169,7 +172,6 @@ class Dashboard(QWidget):
 
         self.observer = QFileSystemWatcher(self)
         for path in objects.searchdirs:
-            print(f'Watching dir {path}')
             self.observer.addPath(path)
         self.observer.fileChanged.connect(lambda : self.repopulateSystems())
         self.observer.directoryChanged.connect(lambda : self.repopulateSystems())
@@ -251,13 +253,18 @@ class Dashboard(QWidget):
         self.pushButton.clicked.connect(lambda: self.addWidget(SystemRepresenter()))
         self.gridlist.itemDoubleClicked.connect(self.systemOpened)
 
-    def systemOpened(self, sysrepper : SystemRepresenter):
+    def systemOpened(self, sysrepper : QListWidgetItem):
+        sysrepper = self.gridlist.itemWidget(sysrepper)
         
-        file = utilities.searchFilesForUUID(str(sysrepper.represented.uuid))
+        file = utilities.searchFilesForUUID(utilities.getFilesWithExtension(objects.searchdirs), str(sysrepper.represented.uuid))
         if file != False:
             sys = System.loadFromFile(file)
-            if sys not in objects.systems:
-                objects.systems.append(sys)
+            if sys in objects.systems:
+                objects.systems.remove(sys)
+            print(f"Opened {sys.uuid}")
+            objects.systems.append(sys)
+            self.requestSystemOpened.emit(sys)
+            
         else:
             print(f"ERROR: Could not open system with uuid {str(sysrepper.represented.uuid)}")
         

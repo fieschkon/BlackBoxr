@@ -1,7 +1,7 @@
 import copy
 from typing import Optional
 from PySide6.QtWidgets import (
-    QLabel, QWidget,QTextEdit, QLineEdit, QDialog, QVBoxLayout, QScrollArea, QGridLayout, QComboBox, QDialogButtonBox, QSpacerItem, QSizePolicy, QHBoxLayout, QTreeWidget, QTreeWidgetItem, QAbstractItemView
+    QLabel, QMainWindow, QDockWidget, QWidget,QTextEdit, QLineEdit, QDialog, QVBoxLayout, QScrollArea, QGridLayout, QComboBox, QDialogButtonBox, QSpacerItem, QSizePolicy, QHBoxLayout, QTreeWidget, QTreeWidgetItem, QAbstractItemView
 )
 from PySide6.QtGui import QFont, QFontMetrics, QTextCursor, QPainter, QPen, QPainterPath, QRegion
 from PySide6.QtCore import Signal, Slot, QRect, QSize, Qt
@@ -942,17 +942,73 @@ class DesignView(GenericCanvasView):
             self.toplevelDLs = QTreeWidgetItem(self.toplevelSystems)
             self.toplevelDLs.setText(0, system.name)
 
-class RequirementsView(GenericCanvasView):
+class RequirementsView(QMainWindow):
     def __init__(self, source: System, parent: Optional[QtWidgets.QWidget]) -> None:
-        super().__init__(source, parent)
-        self.insys = source
-        self.Scene = RequirementsScene(source)
-        self.Viewer = RequirementsViewer(self.Scene, source)
+        super().__init__(parent)
 
-        self.horizontalLayout.addWidget(self.Viewer)
+        self.Scene : DiagramScene = RequirementsScene(source)
+        self.Viewer : DiagramViewer = RequirementsViewer(self.Scene, source)
+        self.source = source
+        self.source.subscribe(self.onSystemUpdate)
+        self.setupui()
+        self.repopulateTree()
+
+    def onSystemUpdate(self):
+        self.repopulateTree()
+
+    def repopulateTree(self):
+        self.ElementTree.clear()
+        self.toplevelDLs = QTreeWidgetItem(self.ElementTree)
+        self.toplevelDLs.setText(0, "Requirements in this project")
+        self.toplevelSystems = QTreeWidgetItem(self.ElementTree)
+        self.toplevelSystems.setText(0, "Available Standards")
+        self.ElementTree.addTopLevelItem(self.toplevelDLs)
+        self.ElementTree.addTopLevelItem(self.toplevelSystems)
+
+        # Populate Requirements
+        for requirement in self.source.RL:
+            print("yo")
+            inrl = QTreeWidgetItem(self.toplevelDLs)
+            # TODO: Make this configurable
+            inrl.setText(0, requirement.public['Name'])
+            inrl.setData(1, 0, str(requirement.uuid))
+
+        # Populate Systems
+        '''for system in objects.systems:
+            system : System
+            sysItem = QTreeWidgetItem(self.toplevelSystems)
+            sysItem.setText(0, system.name)'''
+
+    def setupui(self):
+
+        self.centralwidget = QWidget(self)
+        self.centralwidget.setObjectName(u"centralwidget")
+        self.verticalLayout = QVBoxLayout(self.centralwidget)
+        self.verticalLayout.setObjectName(u"verticalLayout")
+
+        self.verticalLayout.addWidget(self.Viewer)
+
+        self.setCentralWidget(self.centralwidget)
+        self.TreeDockWidget = QDockWidget(self)
+        self.TreeDockWidget.setObjectName(u"TreeDockWidget")
+        self.TreeDockWidget.setAutoFillBackground(False)
+        self.dockWidgetContents = QWidget()
+        self.dockWidgetContents.setObjectName(u"dockWidgetContents")
+        self.TreeDockWidget.setWidget(self.dockWidgetContents)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.TreeDockWidget)
+
+        self.ElementTree = QTreeWidget(self.TreeDockWidget)
+        __qtreewidgetitem = QTreeWidgetItem()
+        __qtreewidgetitem.setText(0, u"Available Requirements")
+        self.ElementTree.setHeaderItem(__qtreewidgetitem)
+        self.ElementTree.setSelectionMode(QTreeWidget.SelectionMode.ContiguousSelection)
+        self.ElementTree.setSortingEnabled(True)
+
+        self.TreeDockWidget.setWidget(self.ElementTree)
 
         self.Scene.setSceneRect(0,0,50000,50000)
         self.Viewer.centerOn(25000, 25000)
+
                 
 class DisplayItem(QWidget):
     def __init__(self, item : Element, parent: Optional[QtWidgets.QWidget] = None) -> None:

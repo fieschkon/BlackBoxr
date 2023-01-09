@@ -299,9 +299,9 @@ class RequirementNode(NodeBase):
         bbox = self.boundingRect()
         # (self.boundingRect().width()/2)-(Socket.PILLSIZE.width()/2)
 
-        painter.setBrush(qdarktheme.load_palette().text().color())
+        painter.setBrush(configuration.NodeZoomedColor.color())
         pen = painter.pen()
-        pen.setColor(qdarktheme.load_palette().text().color())
+        pen.setColor(configuration.NodeZoomedColor.color())
         pen.setCapStyle(Qt.RoundCap)
         painter.setPen(pen)
         font = QFont('arial', 24)
@@ -540,6 +540,28 @@ class Socket(QGraphicsItem):
                 self.connectTrace(self.trace)
                 self.trace.setZValue(10)
                 self.trace.moved = False
+                '''elif isinstance(item, RequirementNode) or isinstance(item, QGraphicsProxyWidget):
+                if self.trace._sourcePoint.socketType == Socket.IOTYPE.OUT:
+                    if isinstance(item, QGraphicsProxyWidget):
+                        socket = item.parent().topSocket
+                    else:
+                        socket = item.topSocket
+                    self.trace._destinationPoint = socket
+                    socket.connectTrace(self.trace)
+                    self.connectTrace(self.trace)
+                    self.trace.setZValue(10)
+                    self.trace.moved = False
+                elif self.trace._sourcePoint.socketType == Socket.IOTYPE.IN:
+                    if isinstance(item, QGraphicsProxyWidget):
+                        socket = item.parent().bottomSocket
+                    else:
+                        socket = item.bottomSocket
+                    self.trace._sourcePoint = socket
+                    self.trace._destinationPoint = self
+                    socket.connectTrace(self.trace)
+                    self.connectTrace(self.trace)
+                    self.trace.setZValue(10)
+                    self.trace.moved = False'''
             else:
                 self.scene().removeItem(self.trace)
             self.trace = None

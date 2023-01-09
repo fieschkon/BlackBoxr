@@ -93,6 +93,7 @@ class MainWindow(QWidget):
 
         objects.dashboard = Dashboard()
         self.mainTabbedWidget.addTab(objects.dashboard, "Dashboard")
+        objects.dashboard.requestSystemOpened.connect(self.openNewSysTab)
 
         testsys = Datatypes.System()
         testDV = RequirementsView(testsys, self)
@@ -128,6 +129,8 @@ class MainWindow(QWidget):
         tree2root.setPos(300, 400)
         tree2root.connectDownstream(rl4)
 
+        #testDV.repopulateTree()
+
 
 
         self.setWindowTitle(objects.qapp.applicationName())
@@ -136,6 +139,9 @@ class MainWindow(QWidget):
         self.pushButton.setText(u"Settings")
 
         self.pushButton.clicked.connect(lambda : GlobalSettingsDialog().exec_())
+
+    def openNewSysTab(self, sys):
+        self.mainTabbedWidget.addTab(QWidget(), sys.name)
 
     def closeEvent(self, event: PySide6.QtGui.QCloseEvent) -> None:
         size = self.size().toTuple()

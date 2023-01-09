@@ -56,10 +56,31 @@ class System():
         e.updateDate          = inDict['updateDate']
         return copy.deepcopy(e)
 
+    def addRequirement(self, requirement):
+        self.RL.append(requirement)
+        self.notify()
+
+    def addTest(self, test):
+        self.RL.append(test)
+        self.notify()
+
+    def addDL(self, dl):
+        self.DL.append(dl)
+        self.notify()
+
+    def subscribe(self, fn):
+        self.subscribers.append(fn)
+
+    def notify(self):
+        for function in self.subscribers:
+            function()
+
     def __init__(self) -> None:
         self.DL = []
         self.RL = []
         self.TE = []
+
+        self.subscribers = []
 
         self.requiremenPublicFields = ['Name', 'Requirement', 'Rationale', 'Metric']
 
@@ -182,7 +203,7 @@ class Element():
 
         self.subscribelist = []
 
-        self.addToSystem()
+        #self.addToSystem()
 
     def generateCreateTime(self):
         self.createDate = datetime.now().strftime("%m/%d/%y %H:%M:%S")
@@ -297,6 +318,7 @@ class RequirementElement(Element):
         e.owningDL          = inDict["owningDL"]  
         e.upstream          = inDict["upstream"]  
         e.downstream        = inDict["downstream"]
+        e.addToSystem()
         return copy.deepcopy(e)
 
     @staticmethod
@@ -306,11 +328,12 @@ class RequirementElement(Element):
             e.populateFromSystem(True)
         else:
             e.public = {
-                'name' : randomString(),
-                'requirement' : randomString(),
+                'Name' : randomString(),
+                'Requirement' : randomString(),
                 'Rationale' : randomString(),
                 'Metric' : randomString()
             }
+        e.addToSystem()
         return e
 
 
@@ -328,7 +351,8 @@ class RequirementElement(Element):
         self.populateFromSystem()
 
     def addToSystem(self):
-        self.owningSystem.RL.append(self)
+        self.owningSystem.addRequirement(self)
+        #self.owningSystem.RL.append(self)
 
     def toDict(self) -> dict:
         d = super().toDict()

@@ -65,6 +65,14 @@ def getDuration(then, now = datetime.now(), interval = "default"):
         'default': totalDuration()
     }
 
+def getFilesWithExtension(paths : list, extension : str = '.json'):
+  files = []
+  for path in paths:
+    for file in os.listdir(path):
+      if file.endswith(extension):
+          files.append(os.path.join(path, file))
+  return files
+
 def searchFilesForUUID(files : list[str], uuid : str):
   print(f'Searching for {uuid}...')
   for file in files:

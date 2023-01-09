@@ -4,6 +4,7 @@ import typing
 from typing import NewType
 from PySide6.QtGui import QColor
 import qdarktheme
+from qdarktheme import _style_loader
 from BlackBoxr import utilities
 from BlackBoxr.misc import objects
 from BlackBoxr.graphics.GUITypes import ThemedColor
@@ -37,6 +38,8 @@ HeaderTextColor = QColor(255, 255, 255, 255)
 
 CanvasColor = QColor(33, 33, 33, 255)
 GridColor = ThemedColor(QColor(211, 211, 211, 255) , QColor(47, 47, 47, 255))
+
+NodeZoomedColor = ThemedColor(QColor(47, 47, 47, 255), QColor(211, 211, 211, 255))
 
 SelectColor = QColor(255, 223, 100, 255)
 
