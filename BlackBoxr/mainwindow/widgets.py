@@ -979,9 +979,14 @@ class RequirementsView(QMainWindow):
             sysItem.setText(0, system.name)'''
 
     def renameItem(self, searchText, newText):
-        print(f'Searching for {searchText}')
+        '''print(f'Searching for {searchText}')
         print(self.ElementTree.findItems(searchText, Qt.MatchCaseSensitive, 0))#[0].setText(0, newText)
-        #self.toplevelDLs.sortChildren()
+        print([child.text(0) for child in self.toplevelDLs.takeChildren()])'''
+
+        for child in [self.toplevelDLs.child(i) for i in range(self.toplevelDLs.childCount())]:
+            if child.text(0) == searchText:
+                child.setText(0, newText)
+
 
     def setupui(self):
 
