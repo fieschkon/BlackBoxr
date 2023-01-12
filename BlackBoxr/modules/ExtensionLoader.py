@@ -32,3 +32,6 @@ class Plugin():
     
     def run(self, *args, **kwargs):
         return self.func.run(*args, **kwargs)
+
+    def info(self):
+        return self.func.info()

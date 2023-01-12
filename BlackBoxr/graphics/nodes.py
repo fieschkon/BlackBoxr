@@ -669,7 +669,7 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
         else:
             d = self._destinationPoint
 
-        self.nodePath = objects.plugins[0].run(ref=self)
+        self.nodePath = objects.plugins['Tracing'][0].run(ref=self)
         path = QtGui.QPainterPath(s)
 
         for coord in self.nodePath:

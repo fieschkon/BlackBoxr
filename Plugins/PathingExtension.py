@@ -38,7 +38,8 @@ class Plugin():
             'name' : 'Smart Pathing Extension',
             'author' : 'Max Fieschko',
             'description' : 'Use Dijkstra to route traces. Performance intensive.',
-            'version' : 'v1'
+            'version' : 'v1',
+            'category' : 'Tracing'
         }
 
     ## Unique Plugin Contents ##

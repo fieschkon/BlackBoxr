@@ -34,7 +34,19 @@ makeDir(tmpdir)
 
 searchdirs = [datadir]
 
-plugins = ExtensionLoader.ExtractPackages()
+def buildPlugins():
+    rawplugins = ExtensionLoader.ExtractPackages()
+    processedplugins = {}
+    for plugin in rawplugins:
+        plugininfo : dict = plugin.info()
+        category = plugininfo.get('category', 'Unknown Category')
+        if category not in list(processedplugins.keys()):
+            processedplugins[category] = [plugin]
+        else:
+            processedplugins[category].append(plugin)
+    return processedplugins
+
+plugins = buildPlugins()  
 
 def getFilesInDataPaths():
     files = []
