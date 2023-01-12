@@ -50,9 +50,9 @@ class System():
         
         e.name                = inDict['name']
         e.createDate          = inDict['createDate']
-        e.DL                  = [DesignElement.fromDict(dl) for dl in inDict['DesignElements']]
-        e.RL                  = [RequirementElement.fromDict(rl) for rl in inDict['RequirementElements']]
-        e.TE                  = [TestElement.fromDict(te) for te in inDict['TestElements']]
+        e.DL                  = [DesignElement.fromDict(dl, e) for dl in inDict['DesignElements']]
+        e.RL                  = [RequirementElement.fromDict(rl, e) for rl in inDict['RequirementElements']]
+        e.TE                  = [TestElement.fromDict(te, e) for te in inDict['TestElements']]
         e.updateDate          = inDict['updateDate']
         return copy.deepcopy(e)
 
