@@ -946,8 +946,8 @@ class RequirementsView(QMainWindow):
     def __init__(self, source: System, parent: Optional[QtWidgets.QWidget]) -> None:
         super().__init__(parent)
 
-        self.Scene : DiagramScene = RequirementsScene(source)
-        self.Viewer : DiagramViewer = RequirementsViewer(self.Scene, source)
+        self.Scene : DiagramScene = RequirementsScene(source, self)
+        self.Viewer : DiagramViewer = RequirementsViewer(self.Scene, source, self)
         self.source = source
         self.source.subscribe(self.onSystemUpdate)
         self.setupui()
@@ -967,7 +967,6 @@ class RequirementsView(QMainWindow):
 
         # Populate Requirements
         for requirement in self.source.RL:
-            print("yo")
             inrl = QTreeWidgetItem(self.toplevelDLs)
             # TODO: Make this configurable
             inrl.setText(0, requirement.public['Name'])
@@ -978,6 +977,11 @@ class RequirementsView(QMainWindow):
             system : System
             sysItem = QTreeWidgetItem(self.toplevelSystems)
             sysItem.setText(0, system.name)'''
+
+    def renameItem(self, searchText, newText):
+        print(f'Searching for {searchText}')
+        print(self.ElementTree.findItems(searchText, Qt.MatchCaseSensitive, 0))#[0].setText(0, newText)
+        #self.toplevelDLs.sortChildren()
 
     def setupui(self):
 
@@ -1060,7 +1064,8 @@ class DisplayItem(QWidget):
     def itemChanged(self, key, value):
         prevpublic = copy.deepcopy(self.ownedItem.public)
         self.ownedItem.public[key] = value
-        print(utilities.diffdict(prevpublic, self.ownedItem.public))
+        self.graphicsProxyWidget().scene().viewpane.renameItem(prevpublic[key], value)
+        #print(utilities.diffdict(prevpublic, self.ownedItem.public))
 
 class FieldWidget(QWidget):
 

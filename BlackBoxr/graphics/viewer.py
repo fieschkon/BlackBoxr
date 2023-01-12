@@ -189,8 +189,9 @@ class DiagramScene(QGraphicsScene):
 
 class RequirementsScene(DiagramScene):
 
-    def __init__(self, insys=None):
+    def __init__(self, insys=None, viewpane=None):
         super().__init__(insys)
+        self.viewpane = viewpane
 
     def contextMenuEvent(self, event: QtWidgets.QGraphicsSceneContextMenuEvent) -> None:
         return super().contextMenuEvent(event)
@@ -305,9 +306,10 @@ class RequirementsScene(DiagramScene):
         rl.setPos(at)
 
 class RequirementsViewer(DiagramViewer):
-    def __init__(self, scene: QGraphicsScene, insys=None):
+    def __init__(self, scene: QGraphicsScene, insys=None, viewpane=None):
         super().__init__(scene, insys)
         self.reqscene = scene
+        self.viewpane = viewpane
 
     def contextMenuEvent(self, event) -> None:
         menu = QMenu(self)
