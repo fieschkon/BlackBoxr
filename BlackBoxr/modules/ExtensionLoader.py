@@ -19,9 +19,12 @@ class ExtensionLoader():
         for path in ExtensionLoader.DiscoverExtensions():
             path = os.path.splitext(path)[0]
             path = path.replace(os.sep, '.')
-            p = Plugin(path)
-            modules.append(p)
-            print(f'Found package {path}')
+            try:
+                p = Plugin(path)
+                modules.append(p)
+                print(f'Found package {path}')
+            except Exception as e:
+                print(f'Error while importing plugin: {e}')
 
         return modules
 

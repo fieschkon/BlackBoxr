@@ -150,6 +150,17 @@ class MainWindow(QWidget):
         return super().closeEvent(event)
 
     def setupMenuBar(self):
+        
+        def createImportExportActions():
+            curwid = self.mainTabbedWidget.currentWidget()
+            for exporter in objects.plugins['Exporter']:
+                action : QAction = self.exporterMenu.addAction(exporter.info().get('name', 'Unnamed Exporter'))
+                action.setData(exporter)
+                action.triggered.connect(lambda : action.data().run())
+            for importer in objects.plugins['Importer']:
+                action : QAction = self.importMenu.addAction(importer.info().get('name', 'Unnamed Exporter'))
+                action.setData(importer)
+                action.triggered.connect(lambda : action.data().run())
 
         def export():
             curwid = self.mainTabbedWidget.currentWidget()
@@ -178,9 +189,7 @@ class MainWindow(QWidget):
         self.importMenu = self.menuBar.addMenu("Import")
 
         self.exporterMenu = self.menuBar.addMenu("Export")
-        csvexport = self.exporterMenu.addAction("CSV")
-        csvexport.triggered.connect(lambda : export())
-        #objects.plugins['Exporter'][0].run())
+        createImportExportActions()
 
         undo.setShortcut(QKeySequence(Qt.CTRL | Qt.Key_Z))
         redo.setShortcut(QKeySequence(Qt.CTRL | Qt.Key_Y))
