@@ -652,8 +652,31 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
         for percentage in (x * 0.1 for x in range(0, 10)):
             p = utilities.snapToGrid(utilities.lerp(s, d, percentage), GRIDSIZE[0]*2)
             path.lineTo(p)
+
         path.lineTo(d)
-        return path  
+        return path
+
+    def pluginPath(self):
+        ignoreditems = []
+        if isinstance(self._sourcePoint, QGraphicsItem):
+            s = self.mapFromParent(self._sourcePoint.scenePos())
+            ignoreditems.append(self._sourcePoint)
+        else:
+            s = self._sourcePoint
+        if isinstance(self._destinationPoint, QGraphicsItem):
+            d = self.mapFromParent(self._destinationPoint.scenePos())
+            ignoreditems.append(self._destinationPoint)
+        else:
+            d = self._destinationPoint
+
+        self.nodePath = objects.plugins[0].run(ref=self)
+        path = QtGui.QPainterPath(s)
+
+        for coord in self.nodePath:
+            p = self.mapFromScene(QPointF(coord[0], coord[1]))
+            path.lineTo(p)
+        path.lineTo(d)
+        return path
 
     def smartPath(self):
         ignoreditems = []
@@ -785,7 +808,8 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
         painter.setPen(pen)
         painter.setBrush(QtCore.Qt.NoBrush)
 
-        path = self.directPath()
+        path = self.pluginPath()
+        #self.directPath()
         #self.smartPath()
         painter.drawPath(path)
         self.setPath(path)

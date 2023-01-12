@@ -4,6 +4,7 @@ from typing import cast
 #from BlackBoxr import app
 from PySide6.QtGui import QUndoStack
 from appdirs import *
+from BlackBoxr.modules.ExtensionLoader import ExtensionLoader
 
 from BlackBoxr.utilities import makeDir
 
@@ -32,6 +33,8 @@ makeDir(datadir)
 makeDir(tmpdir)
 
 searchdirs = [datadir]
+
+plugins = ExtensionLoader.ExtractPackages()
 
 def getFilesInDataPaths():
     files = []
