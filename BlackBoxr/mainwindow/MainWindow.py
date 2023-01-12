@@ -22,9 +22,9 @@ from BlackBoxr.misc import configuration, objects, Datatypes
 class MainWindow(QWidget):
     def __init__(self, parent: Optional[PySide6.QtWidgets.QWidget] = None, flags: PySide6.QtCore.Qt.WindowFlags = None) -> None:
         super().__init__()
-        self.setupMenuBar()
         self.resize(int(configuration.winx), int(configuration.winy))
         self.setupUI()
+        self.setupMenuBar()
 
     def setupUI(self):
         self.verticalLayout = QVBoxLayout()
@@ -151,21 +151,36 @@ class MainWindow(QWidget):
 
     def setupMenuBar(self):
 
+        def export():
+            curwid = self.mainTabbedWidget.currentWidget()
+            if isinstance(curwid, RequirementsView):
+                objects.plugins['Exporter'][0].run(insys = curwid.source)
+
         def updateDashboard():
             self.mainTabbedWidget.removeTabByName("Dashboard")
             objects.dashboard = Dashboard()
             self.mainTabbedWidget.addTab(objects.dashboard, "Dashboard")
 
         self.menuBar = QMenuBar(None)
-        fileMenu = self.menuBar.addMenu("View")
-        dashboardView = fileMenu.addAction("View Dashboard")
+        self.verticalLayout.setMenuBar(self.menuBar)
+        viewMenu = self.menuBar.addMenu("View")
+        dashboardView = viewMenu.addAction("View Dashboard")
         dashboardView.triggered.connect(lambda : updateDashboard())
+        pluginManager = viewMenu.addAction("Plugin Manager")
+        pluginManager.triggered.connect(lambda : updateDashboard())
 
         editMenu = self.menuBar.addMenu("Edit")
         undo = editMenu.addAction("Undo")
         undo.triggered.connect(lambda : objects.undoStack.undo())
         redo = editMenu.addAction("Redo")
         redo.triggered.connect(lambda : objects.undoStack.redo())
+
+        self.importMenu = self.menuBar.addMenu("Import")
+
+        self.exporterMenu = self.menuBar.addMenu("Export")
+        csvexport = self.exporterMenu.addAction("CSV")
+        csvexport.triggered.connect(lambda : export())
+        #objects.plugins['Exporter'][0].run())
 
         undo.setShortcut(QKeySequence(Qt.CTRL | Qt.Key_Z))
         redo.setShortcut(QKeySequence(Qt.CTRL | Qt.Key_Y))
