@@ -153,11 +153,11 @@ class MainWindow(QWidget):
         
         def createImportExportActions():
             curwid = self.mainTabbedWidget.currentWidget()
-            for exporter in objects.plugins['Exporter']:
+            for exporter in objects.plugins.get('Exporter', []):
                 action : QAction = self.exporterMenu.addAction(exporter.info().get('name', 'Unnamed Exporter'))
                 action.setData(exporter)
                 action.triggered.connect(lambda : action.data().run())
-            for importer in objects.plugins['Importer']:
+            for importer in objects.plugins.get('Importer', []):
                 action : QAction = self.importMenu.addAction(importer.info().get('name', 'Unnamed Exporter'))
                 action.setData(importer)
                 action.triggered.connect(lambda : action.data().run())
