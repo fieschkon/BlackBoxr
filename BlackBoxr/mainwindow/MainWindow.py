@@ -14,125 +14,17 @@ from PySide6.QtCore import QModelIndex, QRect, QSize, Qt
 from PySide6.QtGui import QAction, QPen, QColor, QPainter, QKeySequence, QUndoStack, QFont
 from pip import main
 import BlackBoxr
-from BlackBoxr.graphics.viewer import DiagramScene, DiagramViewer
-from BlackBoxr.graphics.nodes import  DesignNode, NodeBase, Socket
+from BlackBoxr.graphics.nodes import  DesignNode, NodeBase, RequirementNode, Socket
 from BlackBoxr.mainwindow.dashboard.home import Dashboard, SystemRepresenter
-from BlackBoxr.mainwindow.widgets import DetachableTabWidget, GlobalSettingsDialog
+from BlackBoxr.mainwindow.widgets import DesignView, DetachableTabWidget, GlobalSettingsDialog, RequirementsView
 from BlackBoxr.misc import configuration, objects, Datatypes
-
-class MainWindow_LEGACY(QMainWindow):
-    '''Main window for the application'''
-    def __init__(self, parent: Optional[PySide6.QtWidgets.QWidget] = None, flags: PySide6.QtCore.Qt.WindowFlags = None) -> None:
-        super().__init__()
-        self.setupUI()
-
-    def setupUI(self):
-        self.setWindowTitle("BlackBoxr")
-        self.centralwidget = QWidget(self)
-        self.centralwidget.setObjectName(u"centralwidget")
-        self.verticalLayout_2 = QVBoxLayout(self.centralwidget)
-        self.verticalLayout_2.setObjectName(u"verticalLayout_2")
-        self.horizontalLayout = QHBoxLayout()
-        self.horizontalLayout.setObjectName(u"horizontalLayout")
-        self.horizontalLayout_3 = QHBoxLayout()
-        self.horizontalLayout_3.setObjectName(u"horizontalLayout_3")
-        self.LogoLBL = QLabel(self.centralwidget)
-        self.LogoLBL.setObjectName(u"label")
-
-        self.bozo = SystemRepresenter(self.centralwidget)
-        self.horizontalLayout_3.addWidget(self.bozo)
-
-        self.horizontalLayout_3.addWidget(self.LogoLBL)
-
-
-        self.horizontalLayout.addLayout(self.horizontalLayout_3)
-
-        self.horizontalSpacer = QSpacerItem(40, 20, QSizePolicy.Expanding, QSizePolicy.Minimum)
-
-        self.horizontalLayout.addItem(self.horizontalSpacer)
-
-        self.horizontalLayout_4 = QHBoxLayout()
-        self.horizontalLayout_4.setObjectName(u"horizontalLayout_4")
-        self.AuthLBL = QLabel(self.centralwidget)
-        self.AuthLBL.setObjectName(u"label_2")
-
-        self.horizontalLayout_4.addWidget(self.AuthLBL)
-
-
-        self.horizontalLayout.addLayout(self.horizontalLayout_4)
-
-
-        self.verticalLayout_2.addLayout(self.horizontalLayout)
-
-        self.tabWidget = QTabWidget(self.centralwidget)
-        self.tabWidget.setObjectName(u"tabWidget")
-        self.tabWidget.setLayoutDirection(QtCore.Qt.LeftToRight)
-        self.tabWidget.setAutoFillBackground(False)
-        self.tabWidget.setTabPosition(QTabWidget.North)
-        self.tabWidget.setTabShape(QTabWidget.Rounded)
-        self.tabWidget.setUsesScrollButtons(True)
-        self.tabWidget.setDocumentMode(False)
-        # Sys Designer
-        self.sysdesigner = SysDesign(self.centralwidget)
-        self.tabWidget.addTab(self.sysdesigner, "System Design")
-
-        self.tab = testScene()
-        self.sysdesigner.addTab(self.tab, "Demo Scene")
-        self.tab_2 = QWidget()
-        self.tabWidget.addTab(self.tab_2, "Requirements")
-
-        self.verticalLayout_2.addWidget(self.tabWidget)
-
-        self.setCentralWidget(self.centralwidget)
-        self.statusbar = QStatusBar(self)
-        self.statusbar.setObjectName(u"statusbar")
-        self.setStatusBar(self.statusbar)
-        self.dockWidget = QDockWidget(self)
-        self.dockWidget.setObjectName(u"dockWidget")
-        self.dockWidget.setFeatures(QDockWidget.DockWidgetFloatable|QDockWidget.DockWidgetMovable)
-        self.dockWidgetContents = QWidget()
-        self.dockWidgetContents.setObjectName(u"dockWidgetContents")
-        self.verticalLayout = QVBoxLayout(self.dockWidgetContents)
-        self.verticalLayout.setObjectName(u"verticalLayout")
-        self.treeWidget = QTreeWidget(self.dockWidgetContents)
-        __qtreewidgetitem = QTreeWidgetItem()
-        __qtreewidgetitem.setText(0, u"Object Name")
-        self.treeWidget.setHeaderItem(__qtreewidgetitem)
-        self.treeWidget.setObjectName(u"treeWidget")
-
-        self.verticalLayout.addWidget(self.treeWidget)
-
-        self.dockWidget.setWidget(self.dockWidgetContents)
-        self.addDockWidget(QtCore.Qt.LeftDockWidgetArea, self.dockWidget)
-
-        self.setStatusBar(QStatusBar(self))
-        
-        menu = self.menuBar()
-
-        canvasActionsMenu = menu.addMenu("&Canvas Actions")
-        self.deleteAction = QAction(("Delete Item"), self)
-        self.deleteAction.setShortcut(QKeySequence.Delete)
-        self.deleteAction.triggered.connect(self.deleteItems)
-        self.undoAction = objects.undoStack.createUndoAction(self, ("Undo"))
-        self.undoAction.setShortcuts(QKeySequence.Undo)
-        self.redoAction = objects.undoStack.createRedoAction(self, ("Redo"))
-        self.redoAction.setShortcuts(QKeySequence.Redo)
-
-        canvasActionsMenu.addAction(self.deleteAction)
-        canvasActionsMenu.addAction(self.undoAction)
-        canvasActionsMenu.addAction(self.redoAction)
-
-    def deleteItems(self):
-        if len(self.tab.scene.selectedItems()) == 0:
-            return
-        objects.undoStack.push(Datatypes.DeleteCommand(self.tab.scene))
 
 class MainWindow(QWidget):
     def __init__(self, parent: Optional[PySide6.QtWidgets.QWidget] = None, flags: PySide6.QtCore.Qt.WindowFlags = None) -> None:
         super().__init__()
-        self.setupMenuBar()
         self.resize(int(configuration.winx), int(configuration.winy))
         self.setupUI()
+        self.setupMenuBar()
 
     def setupUI(self):
         self.verticalLayout = QVBoxLayout()
@@ -201,24 +93,11 @@ class MainWindow(QWidget):
 
         objects.dashboard = Dashboard()
         self.mainTabbedWidget.addTab(objects.dashboard, "Dashboard")
+        objects.dashboard.requestSystemOpened.connect(self.openNewSysTab)
 
-        scene = DiagramScene()
-        canvasview = DiagramViewer(scene)
-        self.mainTabbedWidget.addTab(canvasview, "Test Canvas")
-        scene.setSceneRect(0,0,5000,5000)
-        self.db = DesignNode()
-        scene.addItem(self.db)
-        self.db.setPos(100, 100)
-
-        leftsockets = [Socket(self.db) for x in range(11)]
-        rightsockets = [Socket(self.db) for x in range(2)]
-        bottomsockets = [Socket(self.db, vertical=True) for x in range(5)]
-        topsockets = [Socket(self.db, vertical=True) for x in range(10)]
-
-        self.db.rightTerminals += rightsockets
-        self.db.bottomTerminals += bottomsockets
-        self.db.leftTerminals += leftsockets
-        self.db.topTerminals += topsockets
+        testsys = Datatypes.System()
+        testDV = RequirementsView(testsys, self)
+        self.mainTabbedWidget.addTab(testDV, "Test Canvas")
 
         self.setWindowTitle(objects.qapp.applicationName())
         self.label.setText(u"Ico")
@@ -227,6 +106,9 @@ class MainWindow(QWidget):
 
         self.pushButton.clicked.connect(lambda : GlobalSettingsDialog().exec_())
 
+    def openNewSysTab(self, sys):
+        self.mainTabbedWidget.addTab(QWidget(), sys.name)
+
     def closeEvent(self, event: PySide6.QtGui.QCloseEvent) -> None:
         size = self.size().toTuple()
         configuration.winx = size[0]
@@ -234,6 +116,22 @@ class MainWindow(QWidget):
         return super().closeEvent(event)
 
     def setupMenuBar(self):
+        
+        def createImportExportActions():
+            curwid = self.mainTabbedWidget.currentWidget()
+            for exporter in objects.plugins.get('Exporter', []):
+                action : QAction = self.exporterMenu.addAction(exporter.info().get('name', 'Unnamed Exporter'))
+                action.setData(exporter)
+                action.triggered.connect(lambda : action.data().run())
+            for importer in objects.plugins.get('Importer', []):
+                action : QAction = self.importMenu.addAction(importer.info().get('name', 'Unnamed Exporter'))
+                action.setData(importer)
+                action.triggered.connect(lambda : action.data().run())
+
+        def export():
+            curwid = self.mainTabbedWidget.currentWidget()
+            if isinstance(curwid, RequirementsView):
+                objects.plugins['Exporter'][0].run(insys = curwid.source)
 
         def updateDashboard():
             self.mainTabbedWidget.removeTabByName("Dashboard")
@@ -241,15 +139,23 @@ class MainWindow(QWidget):
             self.mainTabbedWidget.addTab(objects.dashboard, "Dashboard")
 
         self.menuBar = QMenuBar(None)
-        fileMenu = self.menuBar.addMenu("View")
-        dashboardView = fileMenu.addAction("View Dashboard")
+        self.verticalLayout.setMenuBar(self.menuBar)
+        viewMenu = self.menuBar.addMenu("View")
+        dashboardView = viewMenu.addAction("View Dashboard")
         dashboardView.triggered.connect(lambda : updateDashboard())
+        pluginManager = viewMenu.addAction("Plugin Manager")
+        pluginManager.triggered.connect(lambda : updateDashboard())
 
         editMenu = self.menuBar.addMenu("Edit")
         undo = editMenu.addAction("Undo")
         undo.triggered.connect(lambda : objects.undoStack.undo())
         redo = editMenu.addAction("Redo")
         redo.triggered.connect(lambda : objects.undoStack.redo())
+
+        self.importMenu = self.menuBar.addMenu("Import")
+
+        self.exporterMenu = self.menuBar.addMenu("Export")
+        createImportExportActions()
 
         undo.setShortcut(QKeySequence(Qt.CTRL | Qt.Key_Z))
         redo.setShortcut(QKeySequence(Qt.CTRL | Qt.Key_Y))
@@ -266,23 +172,3 @@ class SysDesign(QTabWidget):
         self.setTabsClosable(True)
         self.tabCloseRequested.connect(self.removeTab)
 
-
-class testScene(QWidget):
-    
-    def __init__(self) -> None:
-        super().__init__()
-        self.verticalLayout_2 = QVBoxLayout(self)
-        self.scene = DiagramScene()
-        self.view = DiagramViewer(self.scene)
-        self.scene.set_viewer(self.view)
-        self.verticalLayout_2.addWidget(self.view)
-        self.setLayout(self.verticalLayout_2)
-
-        size = (120000, 120000)
-        self.scene.setSceneRect(0,0,size[0],size[1])
-
-        xoffset = size[0] / 2
-        yoffset = size[1] / 2
-
-
-        self.view.centerOn(xoffset,yoffset)

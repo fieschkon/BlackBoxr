@@ -1,13 +1,19 @@
+import copy
+from typing import Optional
 from PySide6.QtWidgets import (
-    QLabel, QWidget, QLineEdit, QDialog, QVBoxLayout, QScrollArea, QGridLayout, QComboBox, QDialogButtonBox, QSpacerItem, QSizePolicy
+    QLabel, QMainWindow, QDockWidget, QWidget,QTextEdit, QLineEdit, QDialog, QVBoxLayout, QScrollArea, QGridLayout, QComboBox, QDialogButtonBox, QSpacerItem, QSizePolicy, QHBoxLayout, QTreeWidget, QTreeWidgetItem, QAbstractItemView
 )
-from PySide6.QtGui import QFont, QFontMetrics
+from PySide6.QtGui import QFont, QFontMetrics, QTextCursor, QPainter, QPen, QPainterPath, QRegion
 from PySide6.QtCore import Signal, Slot, QRect, QSize, Qt
 from PySide6 import QtCore, QtGui, QtWidgets
+from BlackBoxr import utilities
+from BlackBoxr.graphics.viewer import DiagramScene, DiagramViewer, RequirementsScene, RequirementsViewer
 
-from BlackBoxr.misc import configuration
-
+from BlackBoxr.misc import configuration, objects
+from PySide6.QtCharts import QChart, QChartView, QPieSeries
 import qdarktheme
+
+from BlackBoxr.misc.Datatypes import DesignElement, Element, System
 
 bold = QFont("Verdana", 16)
 bold.setBold(True)
@@ -459,18 +465,57 @@ class LineEdit(QLineEdit):
         self.editingFinished.emit()
         return super().focusOutEvent(arg__1)
 
+class TextEdit(QTextEdit):
+    """
+    A TextEdit editor that sends editingFinished events 
+    when the text was changed and focus is lost.
+    """
+
+    editingFinished = QtCore.Signal()
+    receivedFocus = QtCore.Signal()
+    
+    def __init__(self, parent):
+        super(TextEdit, self).__init__(parent)
+        self._changed = False
+        self.setTabChangesFocus( True )
+        self.textChanged.connect( self._handle_text_changed )
+
+    def focusInEvent(self, event):
+        super(TextEdit, self).focusInEvent( event )
+        self.receivedFocus.emit()
+
+    def focusOutEvent(self, event):
+        if self._changed:
+            self.editingFinished.emit()
+        super(TextEdit, self).focusOutEvent( event )
+
+    @QtCore.Slot()
+    def _handle_text_changed(self):
+        self._changed = True
+
+    def setTextChanged(self, state=True):
+        self._changed = state
+
+    def setHtml(self, html):
+        QtGui.QTextEdit.setHtml(self, html)
+        self._changed = False
+
 class KeyPressHandler(QtCore.QObject):
     """Custom key press handler"""
     escapePressed = QtCore.Signal(bool)
     returnPressed = QtCore.Signal(bool)
+    shiftReturnPressed = QtCore.Signal(bool)
 
     def eventFilter(self, obj, event):
         if event.type() == QtCore.QEvent.KeyPress:
             event_key = event.key()
-            if event_key == QtCore.Qt.Key_Escape:
+            if event_key == QtCore.Qt.Key.Key_Escape:
                 self.escapePressed.emit(True)
                 return True
-            if event_key == QtCore.Qt.Key_Return or event_key == QtCore.Qt.Key_Enter:
+            if event_key == QtCore.Qt.Key.Key_Return or event_key == QtCore.Qt.Key.Key_Enter and event_key == QtCore.Qt.Key.Key_Control:
+                self.shiftReturnPressed.emit(True)
+                return True
+            if event_key == QtCore.Qt.Key.Key_Return or event_key == QtCore.Qt.Key.Key_Enter:
                 self.returnPressed.emit(True)
                 return True
 
@@ -481,7 +526,7 @@ class EditableLabel(QWidget):
     textChanged = QtCore.Signal(str)
     def __init__(self, parent=None, **kwargs):
         QWidget.__init__(self, parent=parent)
-
+        
         self.is_editable = kwargs.get("editable", True)
         self.keyPressHandler = KeyPressHandler(self)
 
@@ -491,6 +536,8 @@ class EditableLabel(QWidget):
         
         self.label = QtWidgets.QLabel(self)
         self.label.setObjectName("label")
+        self.label.setAutoFillBackground(False)
+        self.label.setStyleSheet("background-color: rgba(255, 255, 255, 0);")
         self.mainLayout.addWidget(self.label)
         self.lineEdit = LineEdit(self)
         self.lineEdit.setObjectName("lineEdit")
@@ -589,10 +636,10 @@ class GlobalSettingsDialog(QDialog):
         self.gridLayout = QGridLayout()
         self.gridLayout.setObjectName(u"gridLayout")
         self.gridLayout.setContentsMargins(-1, 10, -1, -1)
-        self.label_2 = QLabel(self.scrollAreaWidgetContents)
-        self.label_2.setObjectName(u"label_2")
+        self.themelabel = QLabel(self.scrollAreaWidgetContents)
+        self.themelabel.setObjectName(u"label_2")
 
-        self.gridLayout.addWidget(self.label_2, 1, 0, 1, 1)
+        self.gridLayout.addWidget(self.themelabel, 1, 0, 1, 1)
 
         self.appThemeSelectBox = QComboBox(self.scrollAreaWidgetContents)
         self.appThemeSelectBox.addItems(qdarktheme.get_themes())
@@ -601,10 +648,10 @@ class GlobalSettingsDialog(QDialog):
 
         self.gridLayout.addWidget(self.appThemeSelectBox, 1, 1, 1, 1)
 
-        self.label = QLabel(self.scrollAreaWidgetContents)
-        self.label.setObjectName(u"label")
+        self.namingstylelabel = QLabel(self.scrollAreaWidgetContents)
+        self.namingstylelabel.setObjectName(u"label")
 
-        self.gridLayout.addWidget(self.label, 0, 0, 1, 1)
+        self.gridLayout.addWidget(self.namingstylelabel, 0, 0, 1, 1)
 
         self.namingStyleSelectBox = QComboBox(self.scrollAreaWidgetContents)
         self.namingStyleSelectBox.addItem("")
@@ -613,21 +660,33 @@ class GlobalSettingsDialog(QDialog):
 
         self.gridLayout.addWidget(self.namingStyleSelectBox, 0, 1, 1, 1)
 
+        self.copystylelabel = QLabel(self.scrollAreaWidgetContents)
+        self.copystylelabel.setObjectName(u"label_6")
+
+        self.gridLayout.addWidget(self.copystylelabel, 2, 0, 1, 1)
+
+        self.copystyleSelectBox = QComboBox(self.scrollAreaWidgetContents)
+        self.copystyleSelectBox.addItem("")
+        self.copystyleSelectBox.addItem("")
+        self.copystyleSelectBox.addItem("")
+        self.copystyleSelectBox.setObjectName(u"namingStyleSelectBox")
+
+        self.gridLayout.addWidget(self.copystyleSelectBox, 2, 1, 1, 1)
 
         self.verticalLayout_2.addLayout(self.gridLayout)
 
-        self.label_3 = QLabel(self.scrollAreaWidgetContents)
-        self.label_3.setObjectName(u"label_3")
+        self.fontsettingslabel = QLabel(self.scrollAreaWidgetContents)
+        self.fontsettingslabel.setObjectName(u"label_3")
 
-        self.verticalLayout_2.addWidget(self.label_3)
+        self.verticalLayout_2.addWidget(self.fontsettingslabel)
 
         self.gridLayout_2 = QGridLayout()
         self.gridLayout_2.setObjectName(u"gridLayout_2")
         self.gridLayout_2.setContentsMargins(-1, 10, -1, -1)
-        self.label_4 = QLabel(self.scrollAreaWidgetContents)
-        self.label_4.setObjectName(u"label_4")
+        self.titlesizelabel = QLabel(self.scrollAreaWidgetContents)
+        self.titlesizelabel.setObjectName(u"label_4")
 
-        self.gridLayout_2.addWidget(self.label_4, 0, 0, 1, 1)
+        self.gridLayout_2.addWidget(self.titlesizelabel, 0, 0, 1, 1)
 
         self.lineEdit = QLineEdit(self.scrollAreaWidgetContents)
         self.lineEdit.setObjectName(u"lineEdit")
@@ -635,11 +694,11 @@ class GlobalSettingsDialog(QDialog):
 
         self.gridLayout_2.addWidget(self.lineEdit, 0, 1, 1, 1)
 
-        self.label_5 = QLabel(self.scrollAreaWidgetContents)
-        self.label_5.setObjectName(u"label_5")
-        self.label_5.setMaximumSize(QSize(20, 16777215))
+        self.ptlabel = QLabel(self.scrollAreaWidgetContents)
+        self.ptlabel.setObjectName(u"label_5")
+        self.ptlabel.setMaximumSize(QSize(20, 16777215))
 
-        self.gridLayout_2.addWidget(self.label_5, 0, 2, 1, 1)
+        self.gridLayout_2.addWidget(self.ptlabel, 0, 2, 1, 1)
 
 
         self.verticalLayout_2.addLayout(self.gridLayout_2)
@@ -664,16 +723,21 @@ class GlobalSettingsDialog(QDialog):
         self.buttonBox.rejected.connect(self.reject)
 
         self.setWindowTitle("Global Settings")
-        self.label_2.setText("Theme")
+        self.themelabel.setText("Theme")
 
-        self.label.setText("Default Naming Style:")
+        self.namingstylelabel.setText("Default Naming Style:")
         self.namingStyleSelectBox.setItemText(0, u"By UUID")
         self.namingStyleSelectBox.setItemText(1, u"By Name")
 
-        self.label_3.setText(u"Font Settings")
-        self.label_4.setText(u"Title Size")
+        self.fontsettingslabel.setText(u"Font Settings")
+        self.titlesizelabel.setText(u"Title Size")
         self.lineEdit.setText(u"16")
-        self.label_5.setText(u"pt")
+        self.ptlabel.setText(u"pt")
+
+        self.copystylelabel.setText(u"Copy Style")
+        self.copystyleSelectBox.setItemText(0, u"None")
+        self.copystyleSelectBox.setItemText(1, u"Duplicate")
+        self.copystyleSelectBox.setItemText(2, u"Reference")
 
         self.scrollAreaWidgetContents.resize(self.scrollArea.minimumSizeHint())
         self.scrollArea.resize(self.scrollArea.minimumSizeHint())
@@ -682,7 +746,8 @@ class GlobalSettingsDialog(QDialog):
     def loadSettings(self):
         self.appThemeSelectBox.setCurrentIndex(self.appThemeSelectBox.findText(configuration.themename))
         self.namingStyleSelectBox.setCurrentIndex(self.namingStyleSelectBox.findText(configuration.namingstyle))
-    
+        self.copystyleSelectBox.setCurrentIndex(self.copystyleSelectBox.findText(configuration.copypreference))
+
     def saveSettings(self):
         configuration.globalSettingsSizeX = self.size().width()
         configuration.globalSettingsSizeY = self.size().height()
@@ -692,6 +757,7 @@ class GlobalSettingsDialog(QDialog):
         super().accept()
         configuration.themename = self.appThemeSelectBox.currentText()
         configuration.namingstyle = self.namingStyleSelectBox.currentText()
+        configuration.copypreference = self.copystyleSelectBox.currentText()
         self.saveSettings()
 
     def reject(self) -> None:
@@ -710,3 +776,321 @@ class GlobalSettingsDialog(QDialog):
     def closeEvent(self, arg__1) -> None:
         self.saveSettings()
         return super().closeEvent(arg__1)
+
+class PieChart(QWidget):
+
+    def __init__(self):
+        super().__init__()
+
+        self.series = QPieSeries()
+
+        self.series.append('Jane', 1)
+        self.series.append('Joe', 2)
+        self.series.append('Andy', 3)
+        self.series.append('Barbara', 4)
+        self.series.append('Axel', 5)
+
+        self.slice = self.series.slices()[1]
+        self.slice.setExploded()
+        self.slice.setLabelVisible()
+        self.slice.setPen(QPen(Qt.darkGreen, 2))
+        self.slice.setBrush(Qt.green)
+
+        self.chart = QChart()
+        self.chart.addSeries(self.series)
+        self.chart.setTitle('Simple piechart example')
+        self.chart.legend().hide()
+
+        self._chart_view = QChartView(self.chart)
+        self._chart_view.setRenderHint(QPainter.Antialiasing)
+
+
+class ExpandableLineEdit(QWidget):
+    textChanged = QtCore.Signal(str)
+    textCommitted = QtCore.Signal(str)
+
+    def __init__(self, parent: Optional[QtWidgets.QWidget]) -> None:
+        super().__init__(parent)
+        self.mainLayout = QtWidgets.QHBoxLayout(self)
+        self.mainLayout.setContentsMargins(0, 0, 0, 0)
+        self.mainLayout.setObjectName("mainLayout")
+
+        self.lineEdit = LineEdit(self)
+        self.lineEdit.setObjectName("lineEdit")
+        self.mainLayout.addWidget(self.lineEdit)
+
+        self.textEdit = TextEdit(self)
+        self.textEdit.setObjectName("textEdit")
+        self.mainLayout.addWidget(self.textEdit)
+        self.textEdit.setHidden(True)
+
+        self.setupSignals()
+
+    def text(self) -> str:
+        self.unifyText()
+        return self.lineEdit.text()
+
+    def setText(self, text):
+        self.lineEdit.setText(text)
+        self.textEdit.setText(text)
+
+    def setupSignals(self):
+        self.lineEdit.editingFinished.connect(self.returnPressed)
+        self.textEdit.editingFinished.connect(self.returnPressed)
+        self.lineEdit.textChanged.connect(self.edited)
+        self.textEdit.textChanged.connect(self.edited)
+
+    def returnPressed(self):
+        self.unifyText()
+        self.textCommitted.emit(self.lineEdit.text())
+
+    def edited(self):
+        try:
+            self.evaluate()
+            self.textChanged.emit(self.lineEdit.text())
+        except RecursionError: pass
+
+    def unifyText(self):
+        if self.lineEdit.isHidden():
+            self.lineEdit.setText(self.textEdit.toPlainText())
+        else:
+            self.textEdit.setText(self.lineEdit.text())
+        
+    def evaluate(self):
+        shouldHide = self.getTextWidth() >= self.lineEdit.width()
+        self.unifyText()
+        self.lineEdit.setHidden(shouldHide)
+        self.textEdit.setHidden(not shouldHide)
+        self.lineEdit.blockSignals(shouldHide)
+        self.textEdit.blockSignals(not shouldHide)
+        if shouldHide:
+            if self.lineEdit.hasFocus():
+                self.textEdit.setFocus(Qt.FocusReason.OtherFocusReason)
+                cursor = QTextCursor(self.textEdit.document())
+                cursor.movePosition(QTextCursor.MoveOperation.End)
+                self.textEdit.setTextCursor(cursor)
+        else:
+            if self.textEdit.hasFocus():
+                self.lineEdit.setFocus(Qt.FocusReason.OtherFocusReason)
+
+        
+
+    def getTextWidth(self) -> int:
+        return QFontMetrics(self.font()).horizontalAdvance(self.lineEdit.text())
+
+class GenericCanvasView(QWidget):
+
+    def __init__(self, source : System, parent: Optional[QtWidgets.QWidget]) -> None:
+        super().__init__(parent)
+        self.setupUI()
+        self.source = source
+
+    def setupUI(self):
+        self.horizontalLayout = QHBoxLayout(self)
+        self.horizontalLayout.setObjectName(u"horizontalLayout")
+        self.horizontalLayout.setContentsMargins(0, 0, 0, 0)
+        self.ElementTree = QTreeWidget(self)
+        __qtreewidgetitem = QTreeWidgetItem()
+        __qtreewidgetitem.setText(0, u"Available Elements")
+        self.ElementTree.setHeaderItem(__qtreewidgetitem)
+        self.ElementTree.setObjectName(u"ElementTree")
+        sizePolicy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.ElementTree.sizePolicy().hasHeightForWidth())
+        self.ElementTree.setSizePolicy(sizePolicy)
+        self.ElementTree.setDragDropMode(QAbstractItemView.InternalMove)
+        self.ElementTree.setSelectionMode(QTreeWidget.SelectionMode.ContiguousSelection)
+        self.ElementTree.setSortingEnabled(True)
+        self.ElementTree.setHeaderHidden(False)
+        self.ElementTree.header().setProperty("showSortIndicator", True)
+
+        self.horizontalLayout.addWidget(self.ElementTree)
+
+        self.Scene : DiagramScene = None
+        self.Viewer : DiagramViewer = None
+        
+
+class DesignView(GenericCanvasView):
+
+    def __init__(self, source, parent: Optional[QtWidgets.QWidget]) -> None:
+        super().__init__(source, parent)
+        self.Scene.setSceneRect(0,0,50000,50000)
+        self.Viewer.centerOn(25000, 25000)
+        self.populateTree()
+
+        self.Viewer.newVisibleArea.connect(self.onViewportResize)
+
+
+    def onViewportResize(self, rect):
+        pass
+        '''self.externalConnectors.boundingbox = rect
+        self.externalConnectors.updatePos()'''
+
+    def populateTree(self):
+        self.ElementTree.clear()
+        self.toplevelDLs = QTreeWidgetItem(self.ElementTree)
+        self.toplevelDLs.setText(0, "Design Elements")
+        self.toplevelSystems = QTreeWidgetItem(self.ElementTree)
+        self.toplevelSystems.setText(0, "Available Systems")
+        self.ElementTree.addTopLevelItem(self.toplevelDLs)
+        self.ElementTree.addTopLevelItem(self.toplevelSystems)
+
+        # Populate Systems
+        for system in objects.systems:
+            system : System
+            self.toplevelDLs = QTreeWidgetItem(self.toplevelSystems)
+            self.toplevelDLs.setText(0, system.name)
+
+class RequirementsView(QMainWindow):
+    def __init__(self, source: System, parent: Optional[QtWidgets.QWidget]) -> None:
+        super().__init__(parent)
+
+        self.Scene : DiagramScene = RequirementsScene(source, self)
+        self.Viewer : DiagramViewer = RequirementsViewer(self.Scene, source, self)
+        self.source = source
+        self.source.subscribe(self.onSystemUpdate)
+        self.setupui()
+        self.repopulateTree()
+
+    def onSystemUpdate(self):
+        self.repopulateTree()
+
+    def repopulateTree(self):
+        self.ElementTree.clear()
+        self.toplevelDLs = QTreeWidgetItem(self.ElementTree)
+        self.toplevelDLs.setText(0, "Requirements in this project")
+        self.toplevelSystems = QTreeWidgetItem(self.ElementTree)
+        self.toplevelSystems.setText(0, "Available Standards")
+        self.ElementTree.addTopLevelItem(self.toplevelDLs)
+        self.ElementTree.addTopLevelItem(self.toplevelSystems)
+
+        # Populate Requirements
+        for requirement in self.source.RL:
+            inrl = QTreeWidgetItem(self.toplevelDLs)
+            # TODO: Make this configurable
+            inrl.setText(0, requirement.public['Name'])
+            inrl.setData(1, 0, str(requirement.uuid))
+
+        # Populate Systems
+        '''for system in objects.systems:
+            system : System
+            sysItem = QTreeWidgetItem(self.toplevelSystems)
+            sysItem.setText(0, system.name)'''
+
+    def renameItem(self, searchText, newText):
+        '''print(f'Searching for {searchText}')
+        print(self.ElementTree.findItems(searchText, Qt.MatchCaseSensitive, 0))#[0].setText(0, newText)
+        print([child.text(0) for child in self.toplevelDLs.takeChildren()])'''
+
+        for child in [self.toplevelDLs.child(i) for i in range(self.toplevelDLs.childCount())]:
+            if child.text(0) == searchText:
+                child.setText(0, newText)
+
+
+    def setupui(self):
+
+        self.centralwidget = QWidget(self)
+        self.centralwidget.setObjectName(u"centralwidget")
+        self.verticalLayout = QVBoxLayout(self.centralwidget)
+        self.verticalLayout.setObjectName(u"verticalLayout")
+
+        self.verticalLayout.addWidget(self.Viewer)
+
+        self.setCentralWidget(self.centralwidget)
+        self.TreeDockWidget = QDockWidget(self)
+        self.TreeDockWidget.setObjectName(u"TreeDockWidget")
+        self.TreeDockWidget.setAutoFillBackground(False)
+        self.dockWidgetContents = QWidget()
+        self.dockWidgetContents.setObjectName(u"dockWidgetContents")
+        self.TreeDockWidget.setWidget(self.dockWidgetContents)
+        self.addDockWidget(Qt.LeftDockWidgetArea, self.TreeDockWidget)
+
+        self.ElementTree = QTreeWidget(self.TreeDockWidget)
+        __qtreewidgetitem = QTreeWidgetItem()
+        __qtreewidgetitem.setText(0, u"Available Requirements")
+        self.ElementTree.setHeaderItem(__qtreewidgetitem)
+        self.ElementTree.setSelectionMode(QTreeWidget.SelectionMode.ContiguousSelection)
+        self.ElementTree.setSortingEnabled(True)
+
+        self.TreeDockWidget.setWidget(self.ElementTree)
+
+        self.Scene.setSceneRect(0,0,50000,50000)
+        self.Viewer.centerOn(25000, 25000)
+
+                
+class DisplayItem(QWidget):
+    def __init__(self, item : Element, parent: Optional[QtWidgets.QWidget] = None) -> None:
+        super().__init__(parent)
+        self.resize(380, 480)
+        self.ownedItem = item
+        self.fieldAreas : dict = {}
+        self.setupUI()
+        self.createFields()
+
+        # Rounded corners
+        path = QPainterPath()
+        path.addRoundedRect(0, 0, self.size().width(), self.size().height(), 10, 10)
+        mask = QRegion(path.toFillPolygon().toPolygon())
+        self.setMask(mask)
+
+    def setupUI(self):
+
+        self.verticallayout = QVBoxLayout(self)
+
+        self.idLabel = QLabel(str(self.ownedItem.uuid), self)
+
+        self.verticallayout.addWidget(self.idLabel)
+
+        self.scrollArea = QScrollArea(self)
+        self.scrollArea.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        self.scrollArea.setWidgetResizable(True)
+        self.scrollAreaContents = QtWidgets.QWidget()
+        self.scrollAreaContents.setGeometry(QtCore.QRect(0, 0, 380, 480))
+        self.scrollArea.setWidget(self.scrollAreaContents)
+        self.verticallayout.addWidget(self.scrollArea)
+        
+        self.mainLayout = QVBoxLayout(self.scrollAreaContents)
+        self.scrollAreaContents.setLayout(self.mainLayout)
+        
+
+    def createFields(self):
+        for i, (key, value) in enumerate(self.ownedItem.public.items()):
+            self.fieldAreas[key] = FieldWidget(key, self.scrollAreaContents)
+            self.fieldAreas[key].setText(value)
+            self.fieldAreas[key].edited.connect(lambda title, content : self.itemChanged(title, content))
+            self.mainLayout.addWidget(self.fieldAreas[key])
+
+    def updateFields(self):
+        for key, value in self.ownedItem.public.items():
+            self.fieldAreas[key].setText(value)
+
+
+    def itemChanged(self, key, value):
+        prevpublic = copy.deepcopy(self.ownedItem.public)
+        self.ownedItem.public[key] = value
+        self.graphicsProxyWidget().scene().viewpane.renameItem(prevpublic[key], value)
+        #print(utilities.diffdict(prevpublic, self.ownedItem.public))
+
+class FieldWidget(QWidget):
+
+    edited = Signal(str, str)
+
+    def __init__(self, title, parent: Optional[QtWidgets.QWidget]) -> None:
+        super().__init__(parent)
+        self.title = title
+        self.mainLayout = QVBoxLayout(self)
+        self.setLayout(self.mainLayout)
+
+        self.mainLayout.addWidget(QLabel(title, self))
+        self.textfield = ExpandableLineEdit(self)
+        self.mainLayout.addWidget(self.textfield)
+
+        self.textfield.textCommitted.connect(lambda x: self.edited.emit(title, x))
+        
+
+    def setText(self, text : str):
+        self.textfield.setText(text)
+
+    def text(self):
+        return self.textfield.text()

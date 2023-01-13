@@ -4,8 +4,8 @@ import math
 import os
 from types import NoneType
 from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
-    QMetaObject, QObject, QPoint, QRect,
-    QSize, QTime, QUrl, Qt)
+    QMetaObject, QObject, QPoint, QRect, QFileSystemWatcher,
+    QSize, QTime, QUrl, Qt, Signal)
 from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon, QResizeEvent,
     QImage, QKeySequence, QLinearGradient, QPainter, QPaintEvent,
@@ -13,6 +13,7 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
 from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QLayout, QGridLayout, QListWidget, QListWidgetItem, QListView,
     QPushButton, QSizePolicy, QSpacerItem, QVBoxLayout, QLineEdit,
     QWidget, QTextEdit)
+from BlackBoxr import utilities
 from BlackBoxr.mainwindow.widgets import EditableLabel
 from BlackBoxr.misc import configuration, objects, Datatypes
 from BlackBoxr.misc.Datatypes import System
@@ -35,7 +36,7 @@ class SystemRepresenter(QWidget):
         updatedlabeltext = "{} seconds ago".format(timesince['seconds']) if timesince['seconds'] > 0 else updatedlabeltext
         updatedlabeltext = "{} minutes ago".format(timesince['minutes']) if timesince['minutes'] > 1 else updatedlabeltext
         updatedlabeltext = "{} hours ago".format(timesince['hours']) if timesince['hours'] > 1 else updatedlabeltext
-        updatedlabeltext = "{} days ago".format(timesince['days']) if timesince['days'] > 1 else updatedlabeltext
+        updatedlabeltext = "{} days ago".format(timesince['days']) if timesince['days'] > 0 else updatedlabeltext
 
 
         self.TypeLabel.setText(u"System")
@@ -146,7 +147,7 @@ class SystemRepresenter(QWidget):
         if file != False:
             sys = System.loadFromFile(file)
             sys.setName(text)
-            print(sys.save(file))
+            print(f'Saved system to {sys.save(file)}')
             del sys
         else:
             self.represented.save()
@@ -157,12 +158,28 @@ class SystemRepresenter(QWidget):
             painter = QPainter(self)
             painter.setBrush(configuration.palette.color(configuration.palette.AlternateBase))
             painter.drawRoundedRect(self.rect().adjusted(0,0,-1,-1), 15, 15)'''
-        
+
+
 class Dashboard(QWidget):
+
+    requestSystemOpened = Signal(System)
+
     def __init__(self, parent = None) -> None:
         super().__init__(parent)
         self.setupUI(parent)
         self.systemReppers = []
+        self.discoverSystems()
+
+        self.observer = QFileSystemWatcher(self)
+        for path in objects.searchdirs:
+            self.observer.addPath(path)
+        self.observer.fileChanged.connect(lambda : self.repopulateSystems())
+        self.observer.directoryChanged.connect(lambda : self.repopulateSystems())
+
+    def repopulateSystems(self):
+        self.systemReppers.clear()
+        self.gridlist.clear()
+
         self.discoverSystems()
 
     def discoverSystems(self):
@@ -234,7 +251,22 @@ class Dashboard(QWidget):
         self.pushButton.setText(u"Create")
 
         self.pushButton.clicked.connect(lambda: self.addWidget(SystemRepresenter()))
-        self.gridlist.itemDoubleClicked.connect(lambda x : print(self.gridlist.itemWidget(x)))
+        self.gridlist.itemDoubleClicked.connect(self.systemOpened)
+
+    def systemOpened(self, sysrepper : QListWidgetItem):
+        sysrepper = self.gridlist.itemWidget(sysrepper)
+        
+        file = utilities.searchFilesForUUID(utilities.getFilesWithExtension(objects.searchdirs), str(sysrepper.represented.uuid))
+        if file != False:
+            sys = System.loadFromFile(file)
+            if sys in objects.systems:
+                objects.systems.remove(sys)
+            print(f"Opened {sys.uuid}")
+            objects.systems.append(sys)
+            self.requestSystemOpened.emit(sys)
+            
+        else:
+            print(f"ERROR: Could not open system with uuid {str(sysrepper.represented.uuid)}")
         
 
 

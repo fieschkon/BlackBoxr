@@ -4,8 +4,10 @@ import typing
 from typing import NewType
 from PySide6.QtGui import QColor
 import qdarktheme
+from qdarktheme import _style_loader
 from BlackBoxr import utilities
 from BlackBoxr.misc import objects
+from BlackBoxr.graphics.GUITypes import ThemedColor
 
 config = configparser.ConfigParser()
 
@@ -27,14 +29,17 @@ palette = qdarktheme.load_palette()
 namingstyle = u"By UUID"
 
 # Config Colors
-NodeBackground = QColor(9, 12, 9, 255)
+SocketColor = ThemedColor(QColor(255, 87, 51, 255), QColor(255, 255, 255, 255))
+NodeBackground = ThemedColor(QColor(211, 211, 211, 255) , QColor(9, 12, 9, 255))
 OperationHeader = QColor(139, 140, 139, 255)
 FunctionHeader = QColor(55, 95, 119, 255)
 ExecColor = QColor(255, 255, 255, 255)
 HeaderTextColor = QColor(255, 255, 255, 255)
 
 CanvasColor = QColor(33, 33, 33, 255)
-GridColor = QColor(47, 47, 47, 255)
+GridColor = ThemedColor(QColor(211, 211, 211, 255) , QColor(47, 47, 47, 255))
+
+NodeZoomedColor = ThemedColor(QColor(47, 47, 47, 255), QColor(211, 211, 211, 255))
 
 SelectColor = QColor(255, 223, 100, 255)
 
@@ -58,8 +63,10 @@ winy = 150
 globalSettingsSizeX = 300
 globalSettingsSizeY = 200
 
+copypreference = 'None'
+
 def loadSettings():
-    global winx, winy, themename, namingstyle, stylesheet, globalSettingsSizeX, globalSettingsSizeY
+    global winx, winy, themename, namingstyle, stylesheet, globalSettingsSizeX, globalSettingsSizeY, copypreference
 
     utilities.log('configuration.loadSettings', "Loading Settings...")
 
@@ -76,14 +83,15 @@ def loadSettings():
     themename = config['DEFAULT']['themename']
     stylesheet = qdarktheme.load_stylesheet(themename)
     namingstyle = config['DEFAULT']['namingstyle']
+    copypreference = config['DEFAULT']['copypreference']
 
 
 def saveSettings():
     if not os.path.exists(objects.configfile):
         config['DEFAULT'] = getDefaults()
     else:
-        config['DEFAULT'] = {'winx': winx, 'winy': winy, 'themename' : themename, 'namingstyle' : namingstyle, 'globalSettingsSizeX' : globalSettingsSizeX, 'globalSettingsSizeY' : globalSettingsSizeY}
+        config['DEFAULT'] = {'winx': winx, 'winy': winy, 'themename' : themename, 'namingstyle' : namingstyle, 'globalSettingsSizeX' : globalSettingsSizeX, 'globalSettingsSizeY' : globalSettingsSizeY, 'copypreference' : copypreference}
     write_file()
 
 def getDefaults() -> dict:
-    return {'winx': '200', 'winy': '150', 'themename' : 'dark', 'namingstyle' : 'By UUID', 'globalSettingsSizeX' : '300', 'globalSettingsSizeY' : '200'}
+    return {'winx': '200', 'winy': '150', 'themename' : 'dark', 'namingstyle' : 'By UUID', 'globalSettingsSizeX' : '300', 'globalSettingsSizeY' : '200', 'copypreference' : 'None'}

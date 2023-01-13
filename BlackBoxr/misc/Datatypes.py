@@ -8,18 +8,20 @@ from typing import Type
 from uuid import UUID, uuid4
 import uuid
 import warnings
+import qdarktheme
+from dictdiffer import diff, patch, swap, revert
 from PySide6.QtWidgets import (
     
     QGraphicsItem, QGraphicsScene
 )
-from PySide6.QtCore import QPointF
 from PySide6.QtGui import QUndoCommand
+from PySide6.QtCore import QPointF
 from datetime import datetime
 import json
 
-from BlackBoxr.utilities import first, getDuration
+from BlackBoxr.utilities import first, getDuration, randomString
 from BlackBoxr.misc.objects import datadir, tmpdir, systems
-from BlackBoxr.misc import configuration 
+import BlackBoxr.misc.configuration as configuration
 
 class System():
     
@@ -48,16 +50,39 @@ class System():
         
         e.name                = inDict['name']
         e.createDate          = inDict['createDate']
-        e.DL                  = [DesignElement.fromDict(dl) for dl in inDict['DesignElements']]
-        e.RL                  = [RequirementElement.fromDict(rl) for rl in inDict['RequirementElements']]
-        e.TE                  = [TestElement.fromDict(te) for te in inDict['TestElements']]
+        e.DL                  = [DesignElement.fromDict(dl, e) for dl in inDict['DesignElements']]
+        e.RL                  = [RequirementElement.fromDict(rl, e) for rl in inDict['RequirementElements']]
+        e.TE                  = [TestElement.fromDict(te, e) for te in inDict['TestElements']]
         e.updateDate          = inDict['updateDate']
         return copy.deepcopy(e)
+
+    def addRequirement(self, requirement):
+        self.RL.append(requirement)
+        self.notify()
+
+    def addTest(self, test):
+        self.RL.append(test)
+        self.notify()
+
+    def addDL(self, dl):
+        self.DL.append(dl)
+        self.notify()
+
+    def subscribe(self, fn):
+        self.subscribers.append(fn)
+
+    def notify(self):
+        for function in self.subscribers:
+            function()
 
     def __init__(self) -> None:
         self.DL = []
         self.RL = []
         self.TE = []
+
+        self.subscribers = []
+
+        self.requiremenPublicFields = ['Name', 'Requirement', 'Rationale', 'Metric']
 
         self.name = "Default System Name"
         self.uuid = uuid.uuid4()
@@ -67,6 +92,7 @@ class System():
 
         if self not in systems:
             systems.append(self)
+
 
     def setName(self, name):
         self.name = copy.deepcopy(name)
@@ -119,11 +145,17 @@ class System():
     def __eq__(self, __o: object) -> bool:
         if isinstance(__o, System):
             return self.toDict() == __o.toDict()
+        elif isinstance(__o, dict):
+            return self.toDict() == __o
         return False
 
 # Stuff that goes into a system
 
 class Element():
+
+    @staticmethod
+    def diff(elementA, elementB):
+        return list(diff(elementA.toDict(), elementB.toDict()))
 
     @staticmethod
     def fromDict(inDict : dict, owningSystem : System = None):
@@ -146,9 +178,16 @@ class Element():
     def fromStr(inStr : str, owningSystem : System = None):
         return Element.fromDict(json.loads(str), owningSystem)
 
+    @staticmethod
+    def copy(element):
+        return Element.fromDict(element.toDict())
+
     @abstractmethod
     def addToSystem(self):
         pass
+
+    def subscribe(self, func):
+        self.subscribelist.append(func)
 
     def __init__(self, owningSystem : System = None) -> None:
         self.owningSystem = owningSystem
@@ -158,13 +197,15 @@ class Element():
         
         ''' Fields are used to denote public and private fields '''
         self.public = {}
-        self.private = {}
+        self.private = {'tags' : []}
 
         ''' Time tracking '''
         self.createDate = self.generateCreateTime()
         self.updateDate = self.createDate
 
-        self.addToSystem()
+        self.subscribelist = []
+
+        #self.addToSystem()
 
     def generateCreateTime(self):
         self.createDate = datetime.now().strftime("%m/%d/%y %H:%M:%S")
@@ -183,6 +224,8 @@ class Element():
         if hasattr(self, key):
             if key not in ['updateDate', 'initflag'] and value != self.__getattribute__(key):
                 self.updateDate = datetime.now().strftime("%m/%d/%y %H:%M:%S")
+                for func in self.subscribelist:
+                    func()
         super().__setattr__(key, value)
 
     def __repr__(self) -> str:
@@ -210,39 +253,65 @@ class DesignElement(Element):
     def fromDict(inDict: dict, owningSystem: System = None):
         e = Element.fromDict(inDict, owningSystem)
         e.__class__ = DesignElement
-        e.connectionsTo     = inDict["connectionsTo"]  
-        e.connectionsFrom   = inDict["connectionsFrom"]
+        e.name = inDict["name"]  
+        e.topSockets     = inDict["topSockets"]  
+        e.bottomSockets   = inDict["bottomSockets"]
+        e.leftSockets     = inDict["leftSockets"]  
+        e.rightSockets   = inDict["rightSockets"]
         e.requirements  = inDict["requirements"]
+
+        e.connectionTo = inDict["connectionTo"]
+        e.connectionFrom = inDict["connectionFrom"]
+
         return copy.deepcopy(e)
 
     def __init__(self, owningSystem : System = None) -> None:
         super().__init__(owningSystem)
-        self.connectionsTo    : list[str] = []
-        self.connectionsFrom  : list[str] = []
+        self.name : str = ""
+
+        self.topSockets    : list[str] = []
+        self.bottomSockets  : list[str] = []
+        self.leftSockets    : list[str] = []
+        self.rightSockets  : list[str] = []
+
         self.requirements : list[str] = []
+        self.connectionTo : list[str] = []
+        self.connectionFrom : list[str] = []
+
+        self.addToSystem()
+
+    def hasSockets(self)->bool:
+        return len(self.topSockets) == 0 and len(self.bottomSockets) == 0 and len(self.leftSockets) == 0 and len(self.rightSockets) == 0
 
     def addToSystem(self):
         self.owningSystem.DL.append(self)
 
     def toDict(self) -> dict:
         d = super().toDict()
-        d["connectionsTo"]   = self.connectionsTo
-        d["connectionsFrom"] = self.connectionsFrom
+        d["name"] = self.name
+        d["topSockets"]   = self.topSockets
+        d["bottomSockets"] = self.bottomSockets
+        d["leftSockets"]   = self.leftSockets
+        d["rightSockets"] = self.rightSockets
         d["requirements"] = self.requirements
+
+        d["connectionTo"] = self.connectionTo
+        d["connectionFrom"] = self.connectionFrom
 
         return copy.deepcopy(d)
 
     def addConnectionTo(self, targetDL):
-        if str(targetDL.uuid) not in self.connectionsTo:
-            self.connectionsTo.append(str(targetDL.uuid))
-        if str(self.uuid) not in targetDL.connectionsFrom:
-            targetDL.connectionsFrom.append(str(self.uuid))
+        if str(targetDL.uuid) not in self.connectionTo:
+            self.connectionTo.append(str(targetDL.uuid))
+        if str(self.uuid) not in targetDL.connectionFrom:
+            targetDL.connectionFrom.append(str(self.uuid))
 
     def addConnectionFrom(self, sourceDL):
-        if str(sourceDL.uuid) not in self.connectionsFrom:
-            self.connectionsFrom.append(str(sourceDL.uuid))
-        if str(self.uuid) not in sourceDL.connectionsTo:
-            sourceDL.connectionsTo.append(str(self.uuid))
+        if str(sourceDL.uuid) not in self.connectionFrom:
+            self.connectionFrom.append(str(sourceDL.uuid))
+        if str(self.uuid) not in sourceDL.connectionTo:
+            sourceDL.connectionTo.append(str(self.uuid))
+
 
 class RequirementElement(Element):
 
@@ -253,16 +322,42 @@ class RequirementElement(Element):
         e.owningDL          = inDict["owningDL"]  
         e.upstream          = inDict["upstream"]  
         e.downstream        = inDict["downstream"]
+        e.addToSystem()
         return copy.deepcopy(e)
+
+    @staticmethod
+    def random(insys = None):
+        e = RequirementElement(insys)
+        if insys != None:
+            e.populateFromSystem(True)
+        else:
+            e.public = {
+                'Name' : randomString(),
+                'Requirement' : randomString(),
+                'Rationale' : randomString(),
+                'Metric' : randomString()
+            }
+        e.addToSystem()
+        return e
+
+
+    def populateFromSystem(self, random = False):
+        if self.owningSystem != None:
+            for field in self.owningSystem.requiremenPublicFields:
+                self.public[field] = randomString() if random else ''
+
 
     def __init__(self, owningSystem : System = None) -> None:
         super().__init__(owningSystem)
         self.owningDL   = ""
         self.downstream = []
         self.upstream   = []
+        self.populateFromSystem()
+        self.addToSystem()
 
     def addToSystem(self):
-        self.owningSystem.RL.append(self)
+        self.owningSystem.addRequirement(self)
+        #self.owningSystem.RL.append(self)
 
     def toDict(self) -> dict:
         d = super().toDict()
@@ -284,6 +379,22 @@ class RequirementElement(Element):
         if str(self.uuid) not in RL.downstream:
             RL.downstream.append(str(self.uuid))
 
+    def removeDownstream(self, RL):
+        if str(RL.uuid) in self.downstream:
+            self.downstream.remove(str(RL.uuid))
+        if str(self.uuid) in RL.upstream:
+            RL.upstream.remove(str(self.uuid))
+
+    def removeUpstream(self, RL):
+        if str(RL.uuid) in self.upstream:
+            self.upstream.remove(str(RL.uuid))
+        if str(self.uuid) in RL.downstream:
+            RL.downstream.remove(str(self.uuid))
+
+    def removeFromStreams(self, RL):
+        self.removeDownstream(RL)
+        self.removeUpstream(RL)
+
     def isDownstream(self, dsitem) -> bool:
         return str(dsitem.uuid) in self.downstream
 
@@ -294,6 +405,7 @@ class TestElement(Element):
 
     def __init__(self, owningSystem : System = None) -> None:
         super().__init__(owningSystem)
+        self.addToSystem()
 
     def addToSystem(self):
         self.owningSystem.TE.append(self)
@@ -363,6 +475,8 @@ class NameEdit(QUndoCommand):
     def redo(self):
         self.node.blockname = self.newtext
         self.node.lbl.namelabel.setText(self.newtext)
+
+
 
 '''class ConnectionCommand(QUndoCommand):
     def __init__(self, scene, socketA, socketB):

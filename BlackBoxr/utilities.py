@@ -1,8 +1,14 @@
 # Get first item in iterable
+import copy
 from datetime import datetime
 import logging
 import os
+import platform
+import random
+import string
+import subprocess
 from PySide6.QtCore import QPointF
+from dictdiffer import diff, patch, swap, revert
 
 
 def first(iterable, default=None):
@@ -59,6 +65,14 @@ def getDuration(then, now = datetime.now(), interval = "default"):
         'default': totalDuration()
     }
 
+def getFilesWithExtension(paths : list, extension : str = '.json'):
+  files = []
+  for path in paths:
+    for file in os.listdir(path):
+      if file.endswith(extension):
+          files.append(os.path.join(path, file))
+  return files
+
 def searchFilesForUUID(files : list[str], uuid : str):
   print(f'Searching for {uuid}...')
   for file in files:
@@ -90,3 +104,55 @@ def closestPoint(pointtosearch : QPointF, points : list[QPointF]):
           closest_point = point
           closest_dist = distance
   return closest_point
+
+def getTheme():
+  match platform.system():
+    case 'Darwin':
+      cmd = 'defaults read -g AppleInterfaceStyle'
+      p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
+                          stderr=subprocess.PIPE, shell=True)
+      return 'dark' if bool(p.communicate()[0]) else 'light'
+    case 'Windows':
+      try:
+          import winreg
+      except ImportError:
+          return 'light'
+      registry = winreg.ConnectRegistry(None, winreg.HKEY_CURRENT_USER)
+      reg_keypath = r'SOFTWARE\Microsoft\Windows\CurrentVersion\Themes\Personalize'
+      try:
+          reg_key = winreg.OpenKey(registry, reg_keypath)
+      except FileNotFoundError:
+          return 'light'
+
+      for i in range(1024):
+          try:
+              value_name, value, _ = winreg.EnumValue(reg_key, i)
+              if value_name == 'AppsUseLightTheme':
+                  return 'dark' if value == 0 else 'light'
+          except OSError:
+              break
+      return 'light'
+
+def randomString(length=5)->str:
+  return ''.join(random.choices(string.ascii_letters, k=length))
+
+def diffdict(dictA : dict, dictB : dict):
+  return list(diff(dictA, dictB))
+
+def printMatrix(mat : list[list]):
+  workedmat = [[_el if _el != -1 else 0 for _el in _ar] for _ar in mat]
+  for row in workedmat:
+    print(row)
+
+def snapToGrid(val, base):
+  if isinstance(val, QPointF):
+    return QPointF(snapToGrid(val.x(), base), snapToGrid(val.y(), base))
+  else:
+    return base * round(val/base)
+
+def transpose(mat):
+ 
+  return [*zip(*mat)]
+
+def lerp(pointA : QPointF, pointB : QPointF, percent : float):
+  return pointA + (percent*(pointB - pointA))

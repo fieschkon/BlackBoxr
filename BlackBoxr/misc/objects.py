@@ -4,6 +4,7 @@ from typing import cast
 #from BlackBoxr import app
 from PySide6.QtGui import QUndoStack
 from appdirs import *
+from BlackBoxr.modules.ExtensionLoader import ExtensionLoader
 
 from BlackBoxr.utilities import makeDir
 
@@ -20,6 +21,8 @@ configfile = "{}/config.ini".format(configdir)
 
 systems = []
 
+copiedItems = []
+
 ### Directory Data ###
 
 datadir = user_data_dir(AppName, Org)
@@ -30,6 +33,20 @@ makeDir(datadir)
 makeDir(tmpdir)
 
 searchdirs = [datadir]
+
+def buildPlugins():
+    rawplugins = ExtensionLoader.ExtractPackages()
+    processedplugins = {}
+    for plugin in rawplugins:
+        plugininfo : dict = plugin.info()
+        category = plugininfo.get('category', 'Unknown Category')
+        if category not in list(processedplugins.keys()):
+            processedplugins[category] = [plugin]
+        else:
+            processedplugins[category].append(plugin)
+    return processedplugins
+
+plugins = buildPlugins()  
 
 def getFilesInDataPaths():
     files = []
