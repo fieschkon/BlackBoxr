@@ -27,8 +27,8 @@ jobs:
         pip install pytest-cov
         pip install pytest-xdist
         pip install -r requirements.txt
-        cd Test
     - name: Test with pytest
       run: |
         tree /F
+        cd ..
         pytest -n auto --disable-warnings -s -l -v -ra --tb=long --full-trace
