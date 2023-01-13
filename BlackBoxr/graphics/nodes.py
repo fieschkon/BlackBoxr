@@ -808,7 +808,8 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
         painter.setPen(pen)
         painter.setBrush(QtCore.Qt.NoBrush)
 
-        path = self.pluginPath()
+        path = self.directPath()
+        #self.pluginPath()
         #self.directPath()
         #self.smartPath()
         painter.drawPath(path)

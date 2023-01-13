@@ -99,40 +99,6 @@ class MainWindow(QWidget):
         testDV = RequirementsView(testsys, self)
         self.mainTabbedWidget.addTab(testDV, "Test Canvas")
 
-        # Tree 1
-        rl = RequirementNode(Datatypes.RequirementElement.random(testsys))
-        testDV.Scene.addItem(rl)
-        testDV.Viewer.centerOn(rl)
-        rl.setPos(300, 400)
-
-        rl2 = RequirementNode(Datatypes.RequirementElement.random(testsys))
-        testDV.Scene.addItem(rl2)
-        rl2.setPos(700, 400)
-
-        rl3 = RequirementNode(Datatypes.RequirementElement.random(testsys))
-        testDV.Scene.addItem(rl3)
-        rl3.setPos(1000, 400)
-
-        rl4 = RequirementNode(Datatypes.RequirementElement.random(testsys))
-        testDV.Scene.addItem(rl4)
-        rl4.setPos(1000, 400)
-
-        rl.connectDownstream(rl2)
-        rl2.connectDownstream(rl3)
-        rl2.connectDownstream(rl4)
-
-        # Tree 2
-
-        tree2root = RequirementNode(Datatypes.RequirementElement.random(testsys))
-        testDV.Scene.addItem(tree2root)
-        testDV.Viewer.centerOn(tree2root)
-        tree2root.setPos(300, 400)
-        tree2root.connectDownstream(rl4)
-
-        #testDV.repopulateTree()
-
-
-
         self.setWindowTitle(objects.qapp.applicationName())
         self.label.setText(u"Ico")
         self.label_2.setText(objects.qapp.applicationName())

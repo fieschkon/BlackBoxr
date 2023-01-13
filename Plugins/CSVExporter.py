@@ -1,6 +1,7 @@
 from PySide6.QtWidgets import QFileDialog
 import os
 import csv
+
 class Plugin():
     def run(*args, **kwargs):
         insys = kwargs.get('insys')

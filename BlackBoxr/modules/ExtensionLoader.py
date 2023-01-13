@@ -22,9 +22,12 @@ class ExtensionLoader():
             try:
                 p = Plugin(path)
                 modules.append(p)
-                print(f'Found package {path}')
+                print(f'Found extension {path}')
+            except AttributeError:
+                # Not a plugin
+                pass
             except Exception as e:
-                print(f'Error while importing plugin: {e}')
+                print(f'Error loading extension {path}: {e}, skipping...')
 
         return modules
 
