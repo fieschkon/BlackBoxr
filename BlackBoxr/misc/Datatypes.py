@@ -145,6 +145,8 @@ class System():
     def __eq__(self, __o: object) -> bool:
         if isinstance(__o, System):
             return self.toDict() == __o.toDict()
+        elif isinstance(__o, dict):
+            return self.toDict() == __o
         return False
 
 # Stuff that goes into a system
@@ -276,6 +278,8 @@ class DesignElement(Element):
         self.connectionTo : list[str] = []
         self.connectionFrom : list[str] = []
 
+        self.addToSystem()
+
     def hasSockets(self)->bool:
         return len(self.topSockets) == 0 and len(self.bottomSockets) == 0 and len(self.leftSockets) == 0 and len(self.rightSockets) == 0
 
@@ -349,6 +353,7 @@ class RequirementElement(Element):
         self.downstream = []
         self.upstream   = []
         self.populateFromSystem()
+        self.addToSystem()
 
     def addToSystem(self):
         self.owningSystem.addRequirement(self)
@@ -400,6 +405,7 @@ class TestElement(Element):
 
     def __init__(self, owningSystem : System = None) -> None:
         super().__init__(owningSystem)
+        self.addToSystem()
 
     def addToSystem(self):
         self.owningSystem.TE.append(self)

@@ -116,7 +116,7 @@ class TestRL:
         rl2 = RequirementElement(testSys)
         rl.addDownstream(rl2)
 
-        assert rl == RequirementElement.fromDict(rl.toDict())
+        assert rl == RequirementElement.fromDict(rl.toDict(), testSys)
         assert rl.isDownstream(rl2)
 
     def test_ConnectingTo(self):
@@ -132,16 +132,10 @@ class TestRL:
 class TestSystem:
     def test_Search(self):
         e = random.choice([RequirementElement(testSys) for x in range(10)])
-        assert e == testSys.searchByUUID(e.uuid)
+        assert e == testSys.searchByUUID(str(e.uuid))
 
     def test_Serialize(self):
         assert System.fromDict(testSys.toDict()) == testSys
-
-    def test_diffdict(self):
-        compdict = System.fromDict(testSys.toDict())
-        compdict.setName("Skibbity Boop")
-        print(list(diff(compdict.toDict(), testSys.toDict())))
-        assert True
 
 class TestSerialization:
     def test_SaveLoad(self):
@@ -152,8 +146,6 @@ class TestSerialization:
 
         autosave = testSys.save()
         manualsave = testSys.save("{}/{}.json".format(tmpdir, str(testSys.uuid)))
-
-        skaboop = [sys.save(filename="{}/{}.json".format(datadir, str(sys.uuid))) for sys in [System() for i in range(10)]]
         
 
         assert os.path.exists(autosave)
@@ -164,8 +156,6 @@ class TestSerialization:
         os.remove(autosave)
         os.remove(manualsave)
 
-        for i in skaboop:
-            os.remove(i)
 
 class TestColors:
     def test_AutoDetect(self):
