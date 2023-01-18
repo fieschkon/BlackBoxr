@@ -17,15 +17,18 @@ from PySide6.QtCore import Qt, QRectF, QRect, QPointF, QVariantAnimation, QEasin
 from PySide6 import QtGui
 from PySide6.QtGui import QTransform, QPixmap, QAction, QPainter, QColor, QPen, QBrush, QCursor, QPainterPath, QFont, QFontMetrics, QUndoStack, QKeySequence, QWheelEvent
 from BlackBoxr import utilities
+from BlackBoxr.Application import configuration
 
-from BlackBoxr.mainwindow.widgets import DisplayItem, EditableLabel, ExpandableLineEdit, Label
-from BlackBoxr.misc import configuration, objects
+from BlackBoxr.Application.Panels.Widgets import DisplayItem, EditableLabel, ExpandableLineEdit, Label
+from BlackBoxr.Application import objects
 from BlackBoxr.misc.Datatypes import DesignElement, MoveCommand, NameEdit, RequirementElement
 from BlackBoxr.utilities import closestPoint, printMatrix, snapToGrid
 from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
 from pathfinding.finder.dijkstra import DijkstraFinder
+
+from BBData import Plugins
 
 import qdarktheme
 
@@ -669,7 +672,7 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
         else:
             d = self._destinationPoint
 
-        self.nodePath = objects.plugins['Tracing'][0].run(ref=self)
+        self.nodePath = objects.plugins[Plugins.PluginRole.PATHING][0].run(ref=self)
         path = QtGui.QPainterPath(s)
 
         for coord in self.nodePath:
@@ -808,7 +811,7 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
         painter.setPen(pen)
         painter.setBrush(QtCore.Qt.NoBrush)
 
-        path = self.directPath()
+        path = self.pluginPath()
         #self.pluginPath()
         #self.directPath()
         #self.smartPath()

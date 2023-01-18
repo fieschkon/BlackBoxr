@@ -6,8 +6,8 @@ from PySide6.QtGui import QColor
 import qdarktheme
 from qdarktheme import _style_loader
 from BlackBoxr import utilities
-from BlackBoxr.misc import objects
-from BlackBoxr.graphics.GUITypes import ThemedColor
+from BlackBoxr.Application import objects
+from BlackBoxr.Application.Canvas.GUITypes import ThemedColor
 
 config = configparser.ConfigParser()
 

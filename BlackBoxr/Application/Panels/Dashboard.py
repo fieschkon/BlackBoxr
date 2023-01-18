@@ -14,8 +14,9 @@ from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QLayout, QGrid
     QPushButton, QSizePolicy, QSpacerItem, QVBoxLayout, QLineEdit,
     QWidget, QTextEdit)
 from BlackBoxr import utilities
-from BlackBoxr.mainwindow.widgets import EditableLabel
-from BlackBoxr.misc import configuration, objects, Datatypes
+from BlackBoxr.Application import configuration, objects
+from BlackBoxr.Application.Panels.Widgets import EditableLabel
+from BlackBoxr.misc import Datatypes
 from BlackBoxr.misc.Datatypes import System
 from BlackBoxr.utilities import getDuration, searchFilesForUUID
 

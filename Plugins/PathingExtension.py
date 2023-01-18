@@ -9,7 +9,12 @@ from pathfinding.core.grid import Grid
 from pathfinding.finder.dijkstra import DijkstraFinder
 GRIDSIZE = (25, 25)
 
-class Plugin():
+from BBData import Plugins
+
+class PathingPlugin(Plugins.PluginBase):
+
+    role = Plugins.PluginRole.PATHING
+
     def run(*args, **kwargs):
         ignoreditems = []
 
@@ -27,20 +32,12 @@ class Plugin():
         else:
             d = ref._destinationPoint
 
-        searchbounds : QRectF = Plugin.buildSearchBounds(ref.mapToScene(s), ref.mapToScene(d), ref.scene())
+        searchbounds : QRectF = PathingPlugin.buildSearchBounds(ref.mapToScene(s), ref.mapToScene(d), ref.scene())
         '''if ref.worker != None:
             ref.worker.terminate()'''
-        mat = Plugin.generateMatrixFromScene(searchbounds, ref.scene(), [ref])
-        return Plugin.pathfind(ref.mapToScene(s), ref.mapToScene(d), searchbounds, mat)
+        mat = PathingPlugin.generateMatrixFromScene(searchbounds, ref.scene(), [ref])
+        return PathingPlugin.pathfind(ref.mapToScene(s), ref.mapToScene(d), searchbounds, mat)
 
-    def info():
-        return {
-            'name' : 'Smart Pathing Extension',
-            'author' : 'Max Fieschko',
-            'description' : 'Use Dijkstra to route traces. Performance intensive.',
-            'version' : 'v1',
-            'category' : 'Tracing'
-        }
 
     ## Unique Plugin Contents ##
     def buildSearchBounds(a: QPointF, b: QPointF, scene: QGraphicsScene):
@@ -121,7 +118,7 @@ class Plugin():
                                 pass
                 elif item.__class__.__name__ in ['QGraphicsPathItem', 'ArrowItem']:
                     #isinstance(item, QGraphicsPathItem):
-                    coords = Plugin.gridPointsFromPath(item)
+                    coords = PathingPlugin.gridPointsFromPath(item)
                     for coord in coords:
                         try:
                             mat[coord[1]][coord[0]] = 2

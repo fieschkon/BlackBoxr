@@ -9,8 +9,8 @@ from BlackBoxr import utilities
 from BlackBoxr.misc import Datatypes
 from BlackBoxr.misc.Datatypes import DesignElement, Element, RequirementElement, System, TestElement
 from BlackBoxr.graphics.GUITypes import ThemedColor
-from BlackBoxr.misc.objects import datadir, tmpdir
-from BlackBoxr.misc import configuration
+from BlackBoxr.Application.objects import datadir, tmpdir
+from BlackBoxr.Application import configuration
 from dictdiffer import diff, patch, swap, revert
 from PySide6.QtGui import QColor
 

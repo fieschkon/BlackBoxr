@@ -1,5 +1,5 @@
 
-from BlackBoxr.misc.objects import *
+from BlackBoxr.Application.objects import *
 from BlackBoxr.misc.Datatypes import DesignElement, RequirementElement, System, TestElement
 
 testSys = System()

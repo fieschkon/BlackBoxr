@@ -14,10 +14,11 @@ from PySide6.QtCore import QModelIndex, QRect, QSize, Qt
 from PySide6.QtGui import QAction, QPen, QColor, QPainter, QKeySequence, QUndoStack, QFont
 from pip import main
 import BlackBoxr
-from BlackBoxr.graphics.nodes import  DesignNode, NodeBase, RequirementNode, Socket
-from BlackBoxr.mainwindow.dashboard.home import Dashboard, SystemRepresenter
-from BlackBoxr.mainwindow.widgets import DesignView, DetachableTabWidget, GlobalSettingsDialog, RequirementsView
-from BlackBoxr.misc import configuration, objects, Datatypes
+from BlackBoxr.Application import configuration, objects
+from BlackBoxr.Application.Canvas.Nodes import  DesignNode, NodeBase, RequirementNode, Socket
+from BlackBoxr.Application.Panels.Dashboard import Dashboard, SystemRepresenter
+from BlackBoxr.Application.Panels.Widgets import DesignView, DetachableTabWidget, GlobalSettingsDialog, RequirementsView
+from BlackBoxr.misc import Datatypes
 
 class MainWindow(QWidget):
     def __init__(self, parent: Optional[PySide6.QtWidgets.QWidget] = None, flags: PySide6.QtCore.Qt.WindowFlags = None) -> None:

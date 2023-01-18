@@ -8,9 +8,9 @@ import qdarktheme
 import configparser
 
 import BlackBoxr
-from BlackBoxr.misc import objects
-from BlackBoxr.mainwindow import MainWindow
-from BlackBoxr.misc import configuration
+from BlackBoxr.Application import objects
+from BlackBoxr.Application.Panels.Window import MainWindow
+from BlackBoxr.Application import configuration
 
 
 
@@ -44,7 +44,7 @@ def run(args):
     
     objects.qapp.setApplicationVersion(BlackBoxr.__version__)
 
-    w = MainWindow.MainWindow()
+    w = MainWindow()
     w.show()
     ret =  objects.qapp.exec()
     return ret

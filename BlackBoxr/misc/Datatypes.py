@@ -20,8 +20,8 @@ from datetime import datetime
 import json
 
 from BlackBoxr.utilities import first, getDuration, randomString
-from BlackBoxr.misc.objects import datadir, tmpdir, systems
-import BlackBoxr.misc.configuration as configuration
+from BlackBoxr.Application.objects import datadir, tmpdir, systems
+import BlackBoxr.Application.configuration as configuration
 
 class System():
     

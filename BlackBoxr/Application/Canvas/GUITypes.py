@@ -1,5 +1,5 @@
 from BlackBoxr import utilities
-import BlackBoxr.misc.configuration as configuration
+import BlackBoxr.Application.configuration as configuration
 from PySide6.QtGui import QColor
 
 class ThemedColor():

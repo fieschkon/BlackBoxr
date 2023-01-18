@@ -14,9 +14,10 @@ from PySide6 import QtCore, QtWidgets
 from PySide6.QtCore import Qt, QRectF, QRect, QPointF, QVariantAnimation, QEasingCurve, QLineF, QPoint, Signal
 from PySide6 import QtGui
 from PySide6.QtGui import QTransform, QClipboard, QPixmap, QAction, QPainter, QColor, QPen, QBrush, QCursor, QPainterPath, QFont, QFontMetrics, QUndoStack, QKeySequence, QWheelEvent
-import BlackBoxr.graphics.nodes
+from BlackBoxr.Application import configuration
+import BlackBoxr.Application.Canvas.Nodes
 
-from BlackBoxr.misc import configuration, objects
+from BlackBoxr.Application import objects
 from BlackBoxr.misc.Datatypes import MoveCommand, NameEdit, RequirementElement
 from BlackBoxr.utilities import closestPoint, printMatrix, snapToGrid, transpose
 
@@ -301,7 +302,7 @@ class RequirementsScene(DiagramScene):
         self.views()[0].repaint()
 
     def createRequirement(self, at : QPointF):
-        rl = BlackBoxr.graphics.nodes.RequirementNode(RequirementElement(self.sys))
+        rl = BlackBoxr.Application.Canvas.Nodes.RequirementNode(RequirementElement(self.sys))
         self.addItem(rl)
         rl.setPos(at)
 

@@ -7,9 +7,10 @@ from PySide6.QtGui import QFont, QFontMetrics, QTextCursor, QPainter, QPen, QPai
 from PySide6.QtCore import Signal, Slot, QRect, QSize, Qt
 from PySide6 import QtCore, QtGui, QtWidgets
 from BlackBoxr import utilities
-from BlackBoxr.graphics.viewer import DiagramScene, DiagramViewer, RequirementsScene, RequirementsViewer
+from BlackBoxr.Application import configuration
+from BlackBoxr.Application.Canvas.Viewer import DiagramScene, DiagramViewer, RequirementsScene, RequirementsViewer
 
-from BlackBoxr.misc import configuration, objects
+from BlackBoxr.Application import objects
 from PySide6.QtCharts import QChart, QChartView, QPieSeries
 import qdarktheme
 
