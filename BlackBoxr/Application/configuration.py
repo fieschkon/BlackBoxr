@@ -9,6 +9,7 @@ from BlackBoxr import utilities
 from BlackBoxr.Application import objects
 from BlackBoxr.Application.Canvas.GUITypes import ThemedColor
 
+
 config = configparser.ConfigParser()
 
 def write_file():

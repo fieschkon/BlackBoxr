@@ -1,3 +1,4 @@
+import os
 from typing import Optional
 from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
     QMetaObject, QObject, QPoint, QRect,
@@ -12,6 +13,8 @@ from BlackBoxr.Application.Panels.Window import MainWindow
 
 from BlackBoxr.modules.ExtensionLoader import ExtensionLoader
 from BBData.Delegate import Delegate
+from BlackBoxr.Application.Configuration2 import Settings
+from BlackBoxr.Application import objects
 
 class StartupLauncher(QMainWindow):
 
@@ -79,6 +82,7 @@ class StartupLauncher(QMainWindow):
         self.ProgressBar.setMaximum(steps)
 
         self.InitExtensionLoader()
+        self.loadSettings()
 
         # Done
         self.ProgressBar.setValue(self.ProgressBar.maximum())
@@ -91,7 +95,9 @@ class StartupLauncher(QMainWindow):
             self.currentstep += 1
             self.ProgressBar.setValue(self.currentstep)
         ExtensionLoader.onBuildProgress.connect(extensionLoaderProgress)
-        ExtensionLoader.buildPlugins()
+        ExtensionLoader.populatePlugins()
 
     def loadSettings(self):
-        pass
+        if not os.path.exists(objects.configfile):
+            Settings.saveToFile()
+        Settings.openFromFile()

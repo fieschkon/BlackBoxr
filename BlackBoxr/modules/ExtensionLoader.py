@@ -1,4 +1,5 @@
 from importlib import import_module
+import logging
 import os
 import sys
 
@@ -31,10 +32,10 @@ class ExtensionLoader():
     def ExtractPackages():
         modules : list[tuple] = []
         files = ExtensionLoader.DiscoverExtensions()
-        print(f'{len(files)} files found, {files}')
+        logging.info(f'{len(files)} files found, {files}')
         #files = [path.replace(os.sep, '.') for path in files]
         for (_, module_name, _) in iter_modules([os.path.join(os.getcwd(), 'Plugins')]):
-            print(f'Found {module_name}, checking for plugin data...')
+            logging.info(f'Found {module_name}, checking for plugin data...')
             # import the module and iterate through its attributes
             module = import_module(f"Plugins.{module_name}")
             for attribute_name in dir(module):
@@ -42,7 +43,7 @@ class ExtensionLoader():
 
                 if isclass(attribute) and issubclass(attribute, Plugins.PluginBase):
                     #globals()[attribute_name] = attribute
-                    print(f'Plugin found in Plugins.{module_name}')
+                    logging.info(f'Plugin found in Plugins.{module_name}')
                     modules.append(Plugin(attribute, module))
             '''path = os.path.splitext(path)[0]
             path = path.replace(os.sep, '.')

@@ -6,6 +6,7 @@ from BBData import Plugins
 
 class Plugin(Plugins.PluginBase):
 
+    name = 'CSV Exporter'
     role = Plugins.PluginRole.EXPORT
 
     def run(*args, **kwargs):

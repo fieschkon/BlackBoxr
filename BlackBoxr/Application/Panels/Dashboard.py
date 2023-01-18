@@ -1,5 +1,7 @@
 
 from datetime import datetime
+import json
+import logging
 import math
 import os
 from types import NoneType
@@ -148,7 +150,7 @@ class SystemRepresenter(QWidget):
         if file != False:
             sys = System.loadFromFile(file)
             sys.setName(text)
-            print(f'Saved system to {sys.save(file)}')
+            logging.info(f'Saved system to {sys.save(file)}')
             del sys
         else:
             self.represented.save()
@@ -191,8 +193,11 @@ class Dashboard(QWidget):
             dir = os.path.normpath(dir)
             files += [os.path.join(dir, pos_json) for pos_json in os.listdir(dir) if pos_json.endswith('.json')]
         for file in files:
-            systems.append(System.getDummySystemFromFile(file))
-            systems.sort(key=lambda x: x.deltaSinceUpdate(), reverse=False)
+            try:
+                systems.append(System.getDummySystemFromFile(file))
+                systems.sort(key=lambda x: x.deltaSinceUpdate(), reverse=False)
+            except:
+                pass
         for system in systems:
             self.addWidget(SystemRepresenter(system))
         
@@ -262,12 +267,12 @@ class Dashboard(QWidget):
             sys = System.loadFromFile(file)
             if sys in objects.systems:
                 objects.systems.remove(sys)
-            print(f"Opened {sys.uuid}")
+            logging.info(f"Opened {sys.uuid}")
             objects.systems.append(sys)
             self.requestSystemOpened.emit(sys)
             
         else:
-            print(f"ERROR: Could not open system with uuid {str(sysrepper.represented.uuid)}")
+            logging.error(f"ERROR: Could not open system with uuid {str(sysrepper.represented.uuid)}")
         
 
 

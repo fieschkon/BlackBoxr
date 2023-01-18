@@ -15,7 +15,7 @@ qapp = cast('app.Application', None)
 undoStack = QUndoStack()
 configdir = user_config_dir(AppName, Org)
 makeDir(configdir)
-configfile = "{}/config.ini".format(configdir)
+configfile = "{}/config.json".format(configdir)
 
 ### Runtime Data ###
 
@@ -29,25 +29,15 @@ datadir = user_data_dir(AppName, Org)
 
 tmpdir = user_cache_dir(AppName, Org)
 
+logdir = user_log_dir(AppName, Org)
+
 makeDir(datadir)
 makeDir(tmpdir)
+makeDir(logdir)
 
 searchdirs = [datadir]
 
-def buildPlugins():
-    print(f'Building Plugins...')
-    rawplugins : list[Plugin] = ExtensionLoader.ExtractPackages()
-    processedplugins = {}
-    for plugin in rawplugins:
-        category = plugin.plugin.role
-        print(f'Found {plugin.plugin.name}, adding to {plugin.plugin.role.name}')
-        if category not in list(processedplugins.keys()):
-            processedplugins[category] = [plugin]
-        else:
-            processedplugins[category].append(plugin)
-    return processedplugins
-
-plugins = buildPlugins()  
+plugins = ExtensionLoader.plugins
 
 def getFilesInDataPaths():
     files = []

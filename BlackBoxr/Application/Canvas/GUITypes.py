@@ -1,5 +1,4 @@
 from BlackBoxr import utilities
-import configuration as configuration
 from PySide6.QtGui import QColor
 
 class ThemedColor():
@@ -10,9 +9,7 @@ class ThemedColor():
         self.lightColor = lightColor
         self.darkColor = darkColor
 
-    def color(self, themename = None):
-        if themename == None:
-            themename = configuration.themename
+    def color(self, themename=utilities.getTheme()):
         match themename:
             case 'dark':
                 return self.darkColor

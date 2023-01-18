@@ -15,15 +15,19 @@ from PySide6.QtGui import QAction, QPen, QColor, QPainter, QKeySequence, QUndoSt
 from pip import main
 import BlackBoxr
 from BlackBoxr.Application import configuration, objects
+from BlackBoxr.Application.Configuration2 import Settings
 from BlackBoxr.Application.Canvas.Nodes import  DesignNode, NodeBase, RequirementNode, Socket
 from BlackBoxr.Application.Panels.Dashboard import Dashboard, SystemRepresenter
 from BlackBoxr.Application.Panels.Widgets import DesignView, DetachableTabWidget, GlobalSettingsDialog, RequirementsView
 from BlackBoxr.misc import Datatypes
+from BlackBoxr.modules.ExtensionLoader import ExtensionLoader
+
+from BBData import Plugins
 
 class MainWindow(QWidget):
     def __init__(self, parent: Optional[PySide6.QtWidgets.QWidget] = None, flags: PySide6.QtCore.Qt.WindowFlags = None) -> None:
         super().__init__()
-        self.resize(int(configuration.winx), int(configuration.winy))
+        self.resize(int(Settings.winx), int(Settings.winy))
         self.setupUI()
         self.setupMenuBar()
 
@@ -112,27 +116,27 @@ class MainWindow(QWidget):
 
     def closeEvent(self, event: PySide6.QtGui.QCloseEvent) -> None:
         size = self.size().toTuple()
-        configuration.winx = size[0]
-        configuration.winy = size[1]
+        Settings.winx = size[0]
+        Settings.winy = size[1]
         return super().closeEvent(event)
 
     def setupMenuBar(self):
         
         def createImportExportActions():
             curwid = self.mainTabbedWidget.currentWidget()
-            for exporter in objects.plugins.get('Exporter', []):
-                action : QAction = self.exporterMenu.addAction(exporter.info().get('name', 'Unnamed Exporter'))
+            for exporter in ExtensionLoader.plugins.get(Plugins.PluginRole.EXPORT, []):
+                action : QAction = self.exporterMenu.addAction(exporter.plugin.name)
                 action.setData(exporter)
                 action.triggered.connect(lambda : action.data().run())
-            for importer in objects.plugins.get('Importer', []):
-                action : QAction = self.importMenu.addAction(importer.info().get('name', 'Unnamed Exporter'))
+            for importer in ExtensionLoader.plugins.get(Plugins.PluginRole.IMPORT, []):
+                action : QAction = self.importMenu.addAction(importer.plugin.name)
                 action.setData(importer)
                 action.triggered.connect(lambda : action.data().run())
 
         def export():
             curwid = self.mainTabbedWidget.currentWidget()
             if isinstance(curwid, RequirementsView):
-                objects.plugins['Exporter'][0].run(insys = curwid.source)
+                ExtensionLoader.plugins[Plugins.PluginRole.EXPORT][0].run(insys = curwid.source)
 
         def updateDashboard():
             self.mainTabbedWidget.removeTabByName("Dashboard")

@@ -1,4 +1,5 @@
-import datetime
+from datetime import datetime
+import logging
 import os
 import sys
 from PySide6.QtCore import *
@@ -12,6 +13,7 @@ from BlackBoxr.Application import objects
 from BlackBoxr.Application.Launcher import StartupLauncher
 from BlackBoxr.Application.Panels.Window import MainWindow
 from BlackBoxr.Application import configuration
+from BlackBoxr.Application.Configuration2 import Settings
 
 
 
@@ -19,10 +21,17 @@ def run(args):
     """Initialize everything and run the application."""
     '''if args.temp_basedir:
         args.basedir = tempfile.mkdtemp(prefix='qutebrowser-basedir-')'''
+    logformat = '%(asctime)s :: %(levelname)s :: %(module)s.%(funcName)s :: %(message)s'
+    logging.basicConfig(level=logging.DEBUG, format=logformat, filename=os.path.join(objects.logdir, f'{datetime.now().strftime("%H-%M-%S")}.log'))
+    root = logging.getLogger()
+    root.setLevel(logging.DEBUG)
 
-    def runMainWindow(args):
-        w = MainWindow()
-        w.show()
+    handler = logging.StreamHandler(sys.stdout)
+    handler.setLevel(logging.DEBUG)
+    formatter = logging.Formatter(logformat)
+    handler.setFormatter(formatter)
+    root.addHandler(handler)
+    
 
     #log.init.debug("Main process PID: {}".format(os.getpid()))
 
@@ -35,14 +44,9 @@ def run(args):
 
     #log.init.debug("Initializing application...")
 
-    configuration.loadSettings()
+    #configuration.loadSettings()
 
     objects.qapp = Application(args)
-
-    res = objects.qapp.primaryScreen().availableSize().toTuple()
-    # protect against window starting off screen
-    configuration.winx = min(configuration.winx, res[0])
-    configuration.winy = min(configuration.winy, res[1])
 
     objects.qapp.setOrganizationName(objects.Org)
     objects.qapp.setApplicationName(objects.AppName)
@@ -50,16 +54,24 @@ def run(args):
     objects.qapp.setApplicationVersion(BlackBoxr.__version__)
 
     launcher = StartupLauncher()
-    launcher.operationsFinished.connect(runMainWindow)
     launcher.show()
     launcher.startupOperations()
 
+
+    res = objects.qapp.primaryScreen().availableSize().toTuple()
+    #Settings.winx = min(configuration.winx, res[0])
+    #Settings.winy = min(configuration.winy, res[1])
+
+
+    w = MainWindow()
+    w.show()
 
     ret =  objects.qapp.exec()
     return ret
 
 def shutdown(args):
-    configuration.saveSettings()
+    Settings.saveToFile()
+    #configuration.saveSettings()
 
 
 class Application(QApplication):
@@ -71,7 +83,7 @@ class Application(QApplication):
 
         #log.init.debug("Initializing application...")
 
-        self.launch_time = datetime.datetime.now()
+        self.launch_time = datetime.now()
         self.setAttribute(Qt.AA_UseHighDpiPixmaps, True)
 
         self.setStyleSheet(configuration.stylesheet)

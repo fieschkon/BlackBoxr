@@ -22,6 +22,7 @@ from BlackBoxr.Application import configuration
 from BlackBoxr.Application.Panels.Widgets import DisplayItem, EditableLabel, ExpandableLineEdit, Label
 from BlackBoxr.Application import objects
 from BlackBoxr.misc.Datatypes import DesignElement, MoveCommand, NameEdit, RequirementElement
+from BlackBoxr.modules.ExtensionLoader import ExtensionLoader
 from BlackBoxr.utilities import closestPoint, printMatrix, snapToGrid
 from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
@@ -671,8 +672,8 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
             ignoreditems.append(self._destinationPoint)
         else:
             d = self._destinationPoint
-
-        self.nodePath = objects.plugins[Plugins.PluginRole.PATHING][0].run(ref=self)
+        
+        self.nodePath = ExtensionLoader.plugins[Plugins.PluginRole.PATHING][0].run(ref=self)
         path = QtGui.QPainterPath(s)
 
         for coord in self.nodePath:
