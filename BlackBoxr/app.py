@@ -9,6 +9,7 @@ import configparser
 
 import BlackBoxr
 from BlackBoxr.Application import objects
+from BlackBoxr.Application.Launcher import StartupLauncher
 from BlackBoxr.Application.Panels.Window import MainWindow
 from BlackBoxr.Application import configuration
 
@@ -18,6 +19,10 @@ def run(args):
     """Initialize everything and run the application."""
     '''if args.temp_basedir:
         args.basedir = tempfile.mkdtemp(prefix='qutebrowser-basedir-')'''
+
+    def runMainWindow(args):
+        w = MainWindow()
+        w.show()
 
     #log.init.debug("Main process PID: {}".format(os.getpid()))
 
@@ -44,8 +49,12 @@ def run(args):
     
     objects.qapp.setApplicationVersion(BlackBoxr.__version__)
 
-    w = MainWindow()
-    w.show()
+    launcher = StartupLauncher()
+    launcher.operationsFinished.connect(runMainWindow)
+    launcher.show()
+    launcher.startupOperations()
+
+
     ret =  objects.qapp.exec()
     return ret
 

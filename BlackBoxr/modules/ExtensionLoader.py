@@ -5,14 +5,20 @@ import sys
 from inspect import isclass
 from pkgutil import iter_modules
 from pathlib import Path
-from importlib import import_module
+from importlib import import_module, reload
+from time import sleep
+from types import ModuleType
 
-from BBData import Plugins
+from BBData import Plugins, Delegate
 
 
 plugins = {}
 
 class ExtensionLoader():
+
+    plugins = {}
+    onPackagesExtracted = Delegate()
+    onBuildProgress = Delegate()
 
     def DiscoverExtensions():
         discoveredExtensionPaths : list[str] = []
@@ -23,7 +29,7 @@ class ExtensionLoader():
         return discoveredExtensionPaths
 
     def ExtractPackages():
-        modules = []
+        modules : list[tuple] = []
         files = ExtensionLoader.DiscoverExtensions()
         print(f'{len(files)} files found, {files}')
         #files = [path.replace(os.sep, '.') for path in files]
@@ -36,8 +42,8 @@ class ExtensionLoader():
 
                 if isclass(attribute) and issubclass(attribute, Plugins.PluginBase):
                     #globals()[attribute_name] = attribute
-                    print(f'Plugin found in {attribute_name}')
-                    modules.append(Plugin(attribute))
+                    print(f'Plugin found in Plugins.{module_name}')
+                    modules.append(Plugin(attribute, module))
             '''path = os.path.splitext(path)[0]
             path = path.replace(os.sep, '.')
             try:
@@ -49,12 +55,45 @@ class ExtensionLoader():
                 pass
             except Exception as e:
                 print(f'Error loading extension {path}: {e}, skipping...')'''
-
+        ExtensionLoader.onPackagesExtracted.emit(len(modules))
         return modules
 
+    def buildPlugins():
+        rawplugins : list[Plugin] = ExtensionLoader.ExtractPackages()
+        processedplugins = {}
+        for index, plugin in enumerate(rawplugins):
+            category = plugin.plugin.role
+            if category not in list(processedplugins.keys()):
+                processedplugins[category] = [plugin]
+            else:
+                processedplugins[category].append(plugin)
+            ExtensionLoader.onBuildProgress.emit(index, len(rawplugins))
+        return processedplugins
+
+    def reloadPlugins():
+        for category, plugins in ExtensionLoader.plugins.items():
+            for plugin in plugins:
+                plugin.reload()
+
+    def populatePlugins():
+        if ExtensionLoader.plugins == {}:
+            ExtensionLoader.plugins = ExtensionLoader.buildPlugins()
+        else:
+            ExtensionLoader.plugins = ExtensionLoader.reloadPlugins()
+
 class Plugin():
-    def __init__(self, pluginbase) -> None:
+    def __init__(self, pluginbase, module) -> None:
+        self.module = module
         self.plugin : Plugins.PluginBase = pluginbase
     
     def run(self, *args, **kwargs):
         return self.plugin.run(*args, **kwargs)
+
+    def reload(self):
+        reload(self.module)
+        for attribute_name in dir(self.module):
+            attribute = getattr(self.module, attribute_name)
+
+            if isclass(attribute) and issubclass(attribute, Plugins.PluginBase):
+                self.plugin = attribute
+                break

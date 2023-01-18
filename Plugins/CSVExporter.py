@@ -2,7 +2,12 @@ from PySide6.QtWidgets import QFileDialog
 import os
 import csv
 
-class Plugin():
+from BBData import Plugins
+
+class Plugin(Plugins.PluginBase):
+
+    role = Plugins.PluginRole.EXPORT
+
     def run(*args, **kwargs):
         insys = kwargs.get('insys')
         fileName = QFileDialog.getSaveFileName(None, ("Save Project"), os.getcwd(), ("CSV Files (*.csv)"))[0]

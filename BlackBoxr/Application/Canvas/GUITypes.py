@@ -1,5 +1,5 @@
 from BlackBoxr import utilities
-import BlackBoxr.Application.configuration as configuration
+import configuration as configuration
 from PySide6.QtGui import QColor
 
 class ThemedColor():
@@ -21,3 +21,12 @@ class ThemedColor():
             case 'auto':
                 return self.color(utilities.getTheme())
             
+    def toDict(self):
+        return {
+            'type' : self.__class__.__name__,
+            'light' : (self.lightColor.red(), self.lightColor.green(), self.lightColor.blue()),
+            'dark' : (self.darkColor.red(), self.darkColor.green(), self.darkColor.blue())
+        }
+    
+    def fromDict(indict):
+        return ThemedColor(QColor(indict['light'][0], indict['light'][1], indict['light'][2]), QColor(indict['dark'][0], indict['dark'][1], indict['dark'][2]))
