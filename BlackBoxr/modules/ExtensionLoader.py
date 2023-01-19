@@ -12,9 +12,6 @@ from types import ModuleType
 
 from BBData import Plugins, Delegate
 
-
-plugins = {}
-
 class ExtensionLoader():
 
     plugins = {}
@@ -32,7 +29,7 @@ class ExtensionLoader():
     def ExtractPackages():
         modules : list[tuple] = []
         files = ExtensionLoader.DiscoverExtensions()
-        logging.info(f'{len(files)} files found, {files}')
+        logging.info(f'{len(files)} files found while searching for plugins.')
         #files = [path.replace(os.sep, '.') for path in files]
         for (_, module_name, _) in iter_modules([os.path.join(os.getcwd(), 'Plugins')]):
             logging.info(f'Found {module_name}, checking for plugin data...')
@@ -45,17 +42,6 @@ class ExtensionLoader():
                     #globals()[attribute_name] = attribute
                     logging.info(f'Plugin found in Plugins.{module_name}')
                     modules.append(Plugin(attribute, module))
-            '''path = os.path.splitext(path)[0]
-            path = path.replace(os.sep, '.')
-            try:
-                p = Plugin(path)
-                modules.append(p)
-                print(f'Found extension {path}')
-            except AttributeError:
-                # Not a plugin
-                pass
-            except Exception as e:
-                print(f'Error loading extension {path}: {e}, skipping...')'''
         ExtensionLoader.onPackagesExtracted.emit(len(modules))
         return modules
 
