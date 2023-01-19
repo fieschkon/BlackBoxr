@@ -19,6 +19,7 @@ class ExtensionLoader():
     onBuildProgress = Delegate()
 
     def DiscoverExtensions():
+        logging.info(f'Discovering extensions...')
         discoveredExtensionPaths : list[str] = []
         for root, dirs, files in os.walk(os.path.join(os.getcwd(), 'Plugins')):
             for file in files:
@@ -47,6 +48,7 @@ class ExtensionLoader():
 
     def buildPlugins():
         rawplugins : list[Plugin] = ExtensionLoader.ExtractPackages()
+        logging.info(f'Mounting plugins...')
         processedplugins = {}
         for index, plugin in enumerate(rawplugins):
             category = plugin.plugin.role
@@ -54,6 +56,7 @@ class ExtensionLoader():
                 processedplugins[category] = [plugin]
             else:
                 processedplugins[category].append(plugin)
+            logging.info(f'Mounted {plugin.plugin.name}.')
             ExtensionLoader.onBuildProgress.emit(index, len(rawplugins))
         return processedplugins
 

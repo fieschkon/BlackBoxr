@@ -1,4 +1,5 @@
 from datetime import datetime
+import logging
 import os
 from pathlib import Path
 from typing import Optional
@@ -113,9 +114,11 @@ class StartupLauncher(QMainWindow):
                 fp = os.path.join(path, f)
                 size += os.path.getsize(fp)
         if size > Settings.MaxLoggingSize:
+            logging.info(f'Log directory exceeds {Settings.MaxLoggingSize}, looking for cleaning opportunities...')
             logfiles = utilities.getFilesWithExtension([], extension='.log')
             for logfile in logfiles:
                 logtime = datetime.strptime(Path(logfile).stem, "%H-%M-%S")
                 delta = datetime.now() - logtime
                 if delta.days > 5:
+                    logging.info(f'Found old log {logfile} from {delta.days} days ago. Deleting...')
                     os.remove(logfile)

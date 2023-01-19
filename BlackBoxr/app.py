@@ -16,18 +16,21 @@ from BlackBoxr.Application.Panels.Window import MainWindow
 from BlackBoxr.Application import configuration
 from BlackBoxr.Application.Configuration2 import Settings
 
+def handle_exception(exc_type, exc_value, exc_traceback):
+    if issubclass(exc_type, KeyboardInterrupt):
+        sys.__excepthook__(exc_type, exc_value, exc_traceback)
+        return
 
+    logging.getLogger().critical("Uncaught exception", exc_info=(exc_type, exc_value, exc_traceback))
+
+sys.excepthook = handle_exception
 
 def run(args):
     """Initialize everything and run the application."""
-    '''if args.temp_basedir:
-        args.basedir = tempfile.mkdtemp(prefix='qutebrowser-basedir-')'''
-    '''logformat = '%(asctime)s :: %(levelname)s :: %(module)s.%(funcName)s :: %(message)s'
-    logging.basicConfig(level=logging.DEBUG, format=logformat, filename=os.path.join(objects.logdir, f'{datetime.now().strftime("%H-%M-%S")}.log'))'''
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
 
-    stformat = '%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s'
+    stformat = '%(asctime)s %(levelname)s %(module)s.%(funcName)s(%(lineno)d) %(message)s'
     logformat = logging.Formatter(stformat)
     
     FileLogHandler = RotatingFileHandler(os.path.join(objects.logdir, f'{datetime.now().strftime("%H-%M-%S")}.log'), mode='a', maxBytes=5*1024*1024, 
@@ -42,20 +45,7 @@ def run(args):
     ConsoleHandler.setFormatter(logformat)
     root.addHandler(ConsoleHandler)
     
-
-    #log.init.debug("Main process PID: {}".format(os.getpid()))
-
-    #log.init.debug("Initializing directories...")
-    #standarddir.init(args)
-    #resources.preload()
-
-    #log.init.debug("Initializing config...")
-    #configinit.early_init(args)
-
-    #log.init.debug("Initializing application...")
-
-    #configuration.loadSettings()
-
+    logging.debug("Main process PID: {}".format(os.getpid()))
     objects.qapp = Application(args)
 
     objects.qapp.setOrganizationName(objects.Org)
@@ -68,10 +58,9 @@ def run(args):
     launcher.startupOperations()
 
 
-    res = objects.qapp.primaryScreen().availableSize().toTuple()
+    #res = objects.qapp.primaryScreen().availableSize().toTuple()
     #Settings.winx = min(configuration.winx, res[0])
     #Settings.winy = min(configuration.winy, res[1])
-
 
     w = MainWindow()
     w.show()
