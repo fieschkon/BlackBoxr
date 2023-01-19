@@ -1,5 +1,6 @@
 from datetime import datetime
 import logging
+from logging.handlers import RotatingFileHandler
 import os
 import sys
 from PySide6.QtCore import *
@@ -21,16 +22,25 @@ def run(args):
     """Initialize everything and run the application."""
     '''if args.temp_basedir:
         args.basedir = tempfile.mkdtemp(prefix='qutebrowser-basedir-')'''
-    logformat = '%(asctime)s :: %(levelname)s :: %(module)s.%(funcName)s :: %(message)s'
-    logging.basicConfig(level=logging.DEBUG, format=logformat, filename=os.path.join(objects.logdir, f'{datetime.now().strftime("%H-%M-%S")}.log'))
+    '''logformat = '%(asctime)s :: %(levelname)s :: %(module)s.%(funcName)s :: %(message)s'
+    logging.basicConfig(level=logging.DEBUG, format=logformat, filename=os.path.join(objects.logdir, f'{datetime.now().strftime("%H-%M-%S")}.log'))'''
     root = logging.getLogger()
     root.setLevel(logging.DEBUG)
 
-    handler = logging.StreamHandler(sys.stdout)
-    handler.setLevel(logging.DEBUG)
-    formatter = logging.Formatter(logformat)
-    handler.setFormatter(formatter)
-    root.addHandler(handler)
+    stformat = '%(asctime)s %(levelname)s %(funcName)s(%(lineno)d) %(message)s'
+    logformat = logging.Formatter(stformat)
+    
+    FileLogHandler = RotatingFileHandler(os.path.join(objects.logdir, f'{datetime.now().strftime("%H-%M-%S")}.log'), mode='a', maxBytes=5*1024*1024, 
+                                    backupCount=2, encoding=None, delay=0)
+
+    FileLogHandler.setFormatter(logformat)
+    FileLogHandler.setLevel(logging.INFO)
+    root.addHandler(FileLogHandler)
+
+    ConsoleHandler = logging.StreamHandler(sys.stdout)
+    ConsoleHandler.setLevel(logging.DEBUG)
+    ConsoleHandler.setFormatter(logformat)
+    root.addHandler(ConsoleHandler)
     
 
     #log.init.debug("Main process PID: {}".format(os.getpid()))

@@ -1,4 +1,6 @@
+from datetime import datetime
 import os
+from pathlib import Path
 from typing import Optional
 from PySide6.QtCore import (QCoreApplication, QDate, QDateTime, QLocale,
     QMetaObject, QObject, QPoint, QRect,
@@ -9,6 +11,7 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QPalette, QPixmap, QRadialGradient, QTransform)
 from PySide6.QtWidgets import (QApplication, QHBoxLayout, QLabel, QMainWindow,
     QProgressBar, QSizePolicy, QVBoxLayout, QWidget)
+from BlackBoxr import utilities
 from BlackBoxr.Application.Panels.Window import MainWindow
 
 from BlackBoxr.modules.ExtensionLoader import ExtensionLoader
@@ -83,6 +86,7 @@ class StartupLauncher(QMainWindow):
 
         self.InitExtensionLoader()
         self.loadSettings()
+        self.cleanLogs()
 
         # Done
         self.ProgressBar.setValue(self.ProgressBar.maximum())
@@ -101,3 +105,17 @@ class StartupLauncher(QMainWindow):
         if not os.path.exists(objects.configfile):
             Settings.saveToFile()
         Settings.openFromFile()
+
+    def cleanLogs(self):
+        size = 0
+        for path, dirs, files in os.walk(objects.logdir):
+            for f in files:
+                fp = os.path.join(path, f)
+                size += os.path.getsize(fp)
+        if size > Settings.MaxLoggingSize:
+            logfiles = utilities.getFilesWithExtension([], extension='.log')
+            for logfile in logfiles:
+                logtime = datetime.strptime(Path(logfile).stem, "%H-%M-%S")
+                delta = datetime.now() - logtime
+                if delta.days > 5:
+                    os.remove(logfile)

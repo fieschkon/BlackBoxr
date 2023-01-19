@@ -1,7 +1,7 @@
 import copy
 from typing import Optional
 from PySide6.QtWidgets import (
-    QLabel, QCheckBox, QMainWindow, QDockWidget, QWidget,QTextEdit, QLineEdit, QDialog, QVBoxLayout, QScrollArea, QGridLayout, QComboBox, QDialogButtonBox, QSpacerItem, QSizePolicy, QHBoxLayout, QTreeWidget, QTreeWidgetItem, QAbstractItemView
+    QLabel, QListWidget, QListWidgetItem, QCheckBox, QMainWindow, QDockWidget, QWidget,QTextEdit, QLineEdit, QDialog, QVBoxLayout, QScrollArea, QGridLayout, QComboBox, QDialogButtonBox, QSpacerItem, QSizePolicy, QHBoxLayout, QTreeWidget, QTreeWidgetItem, QAbstractItemView
 )
 from PySide6.QtGui import QFont, QFontMetrics, QTextCursor, QPainter, QPen, QPainterPath, QRegion
 from PySide6.QtCore import Signal, Slot, QRect, QSize, Qt
@@ -1058,7 +1058,7 @@ class DisplayItem(QWidget):
 
     def createFields(self):
         for i, (key, value) in enumerate(self.ownedItem.public.items()):
-            self.fieldAreas[key] = FieldWidget(key, self.scrollAreaContents)
+            self.fieldAreas[key] = OldFieldWidget(key, self.scrollAreaContents)
             self.fieldAreas[key].setText(value)
             self.fieldAreas[key].edited.connect(lambda title, content : self.itemChanged(title, content))
             self.mainLayout.addWidget(self.fieldAreas[key])
@@ -1121,21 +1121,18 @@ class ItemDisplay2(QWidget):
                     self.mainLayout.addWidget(q)
 
             elif isinstance(field, Checks):
-                for index, value in field.options.items():
-                    q = QCheckBox(value['name'], self.scrollAreaContents)
-                    q.setChecked(value['state'])
-                    q.stateChanged.connect(lambda x : field.setOption(index, x))
-                    self.mainLayout.addWidget(q)
+                q = CheckFieldWidget(field, self.scrollAreaContents)
+                self.mainLayout.addWidget(q)
             elif isinstance(field, LongText):
                 pass
             elif isinstance(field, ShortText):
                 pass
 
-        for i, (key, value) in enumerate(self.ownedItem.public.items()):
-            self.fieldAreas[key] = FieldWidget(key, self.scrollAreaContents)
+        '''for i, (key, value) in enumerate(self.ownedItem.public.items()):
+            self.fieldAreas[key] = OldFieldWidget(key, self.scrollAreaContents)
             self.fieldAreas[key].setText(value)
             self.fieldAreas[key].edited.connect(lambda title, content : self.itemChanged(title, content))
-            self.mainLayout.addWidget(self.fieldAreas[key])
+            self.mainLayout.addWidget(self.fieldAreas[key])'''
 
     def updateFields(self):
         for key, value in self.ownedItem.public.items():
@@ -1147,6 +1144,72 @@ class ItemDisplay2(QWidget):
         self.graphicsProxyWidget().scene().viewpane.renameItem(prevpublic[key], value)
 
 class FieldWidget(QWidget):
+
+    def __init__(self, field : Field, parent: Optional[QtWidgets.QWidget] = None) -> None:
+        super().__init__(parent)
+        self.field = field
+        self.setupUi()
+
+    def setupUi(self):
+        self.verticalLayout = QVBoxLayout(self)
+        self.verticalLayout.setObjectName(u"verticalLayout")
+        self.FieldName = QLabel(self)
+        self.FieldName.setObjectName(u"FieldName")
+        sizePolicy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.FieldName.sizePolicy().hasHeightForWidth())
+        self.FieldName.setSizePolicy(sizePolicy)
+
+        self.verticalLayout.addWidget(self.FieldName)
+
+        self.FieldSpecificContainer = QWidget(self)
+        self.FieldSpecificContainer.setObjectName(u"FieldSpecificContainer")
+        self.verticalLayout_2 = QVBoxLayout(self.FieldSpecificContainer)
+        self.verticalLayout_2.setSpacing(0)
+        self.verticalLayout_2.setObjectName(u"verticalLayout_2")
+        self.verticalLayout_2.setContentsMargins(0, 0, 0, 0)
+        self.ListWidget = QListWidget(self.FieldSpecificContainer)
+        self.ListWidget.setObjectName(u"ListWidget")
+        #listsizePolicy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        #self.FieldSpecificContainer.setSizePolicy(listsizePolicy)
+
+        self.verticalLayout_2.addWidget(self.ListWidget)
+        self.verticalLayout.addWidget(self.FieldSpecificContainer)
+
+        #self.FieldName.setText()
+
+class CheckFieldWidget(FieldWidget):
+    def __init__(self, field: Checks, parent: Optional[QtWidgets.QWidget] = None) -> None:
+        super().__init__(field, parent)
+        self.populate()
+        self.processedoptions = {value['name'] : value['state'] for index, value in self.field.options.items()}
+
+    def populate(self):
+        for value in list(self.field.options.values()):
+            item = QListWidgetItem(self.ListWidget)
+            check = QCheckBox(value['name'])
+            check.setChecked(value['state'])
+            check.stateChanged.connect(self.stateChange)
+
+            self.ListWidget.setItemWidget(item, check)
+
+    def stateChange(self, state):
+        self.processInputs()
+        self.updateUnderlyingData()
+        print(self.field.options)
+
+    def processInputs(self):
+        for i in range(self.ListWidget.count()):
+            item = self.ListWidget.item(i)
+            self.processedoptions[self.ListWidget.itemWidget(item).text()] = self.ListWidget.itemWidget(item).isChecked()
+
+    def updateUnderlyingData(self):
+        for key in list(self.field.options.keys()):
+            self.field.options[key]['state'] = self.processedoptions[self.field.options[key]['name']]
+            
+
+class OldFieldWidget(QWidget):
 
     edited = Signal(str, str)
 

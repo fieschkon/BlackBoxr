@@ -10,6 +10,9 @@ from BlackBoxr.Application.Serializer import json_decode, json_encode
 from PySide6.QtGui import QColor
 
 class Settings:
+    # Logging
+    MaxLoggingSize = 10485760
+
     # Runtime Editable
     winx = 200
     winy = 150
