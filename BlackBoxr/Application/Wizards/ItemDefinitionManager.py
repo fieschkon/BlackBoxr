@@ -8,9 +8,9 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
 from PySide6.QtWidgets import (QAbstractButton, QApplication, QDialog, QDialogButtonBox, QLineEdit, QSpacerItem,
-    QHBoxLayout, QHeaderView, QLabel, QPushButton,
+    QHBoxLayout, QHeaderView, QLabel, QPushButton, QHBoxLayout,
     QSizePolicy, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QFrame, QListView, QListWidget, QListWidgetItem,
-    QWidget)
+    QWidget, QCheckBox)
 
 from BBData import BBData
 from BBData.BBData import ItemDefinition, ItemTypeCollection
@@ -146,11 +146,9 @@ class DefinitionEditView(QWidget):
         self.populateFields()
 
     def populateFields(self):
-        print('populating')
         for field in self.itemdef.fields:
-            print(field)
             itemreppr = QListWidgetItem()
-            editor = GenericFieldEdit(field)
+            editor = ChecksEdit(field)
             self.FieldEditWidgets.addItem(itemreppr)
             self.FieldEditWidgets.setItemWidget(itemreppr, editor)
             itemreppr.setSizeHint(editor.sizeHint())
@@ -264,4 +262,52 @@ class GenericFieldEdit(QWidget):
 
         self.FieldNameEdit.setText(self.field.name)
         self.AddOptionButton.setText(u"Add Option")
+        self.AddOptionButton.pressed.connect(self.optionAdded)
 
+    def optionAdded(self):
+        pass
+
+class ChecksEdit(GenericFieldEdit):
+    def __init__(self, field: BBData.Checks, parent: Optional[QWidget] = None) -> None:
+        super().__init__(field, parent)
+    
+    def optionAdded(self):
+        super().optionAdded()
+        self.verticalLayout.addWidget(EditableCheckbox(self))
+
+class EditableCheckbox(QWidget):
+    def __init__(self, parent: Optional[QWidget] = None) -> None:
+        super().__init__(parent)
+        self.fieldname = 'Option Name'
+        self.state = False
+        self.setupUi()
+
+    def setupUi(self):
+        sizePolicy = QSizePolicy(QSizePolicy.Preferred, QSizePolicy.Maximum)
+        sizePolicy.setHorizontalStretch(0)
+        sizePolicy.setVerticalStretch(0)
+        sizePolicy.setHeightForWidth(self.sizePolicy().hasHeightForWidth())
+        self.setSizePolicy(sizePolicy)
+        self.horizontalLayout = QHBoxLayout(self)
+        self.horizontalLayout.setObjectName(u"horizontalLayout")
+        self.OptionNameLineEdit = QLineEdit(self)
+        self.OptionNameLineEdit.setObjectName(u"OptionNameLineEdit")
+
+        self.horizontalLayout.addWidget(self.OptionNameLineEdit)
+
+        self.DefaultStateEdit = QCheckBox(self)
+        self.DefaultStateEdit.setObjectName(u"DefaultStateEdit")
+
+        self.horizontalLayout.addWidget(self.DefaultStateEdit)
+        self.DefaultStateEdit.setText("")
+
+        self.OptionNameLineEdit.editingFinished.connect(self.onNameUpdate)
+        self.DefaultStateEdit.stateChanged.connect(self.onStateChanged)
+
+    def onNameUpdate(self, name):
+        self.fieldname = name
+    def onStateChanged(self, state):
+        self.state = state
+
+    def getTuple(self):
+        return (self.fieldname, self.state)
