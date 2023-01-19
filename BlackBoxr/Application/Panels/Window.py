@@ -19,6 +19,7 @@ from BlackBoxr.Application.Configuration2 import Settings
 from BlackBoxr.Application.Canvas.Nodes import  DesignNode, NodeBase, RequirementNode, Socket
 from BlackBoxr.Application.Panels.Dashboard import Dashboard, SystemRepresenter
 from BlackBoxr.Application.Panels.Widgets import DesignView, DetachableTabWidget, GlobalSettingsDialog, RequirementsView
+from BlackBoxr.Application.Wizards import ItemDefinitionManager
 from BlackBoxr.misc import Datatypes
 from BlackBoxr.modules.ExtensionLoader import ExtensionLoader
 
@@ -148,8 +149,12 @@ class MainWindow(QWidget):
         viewMenu = self.menuBar.addMenu("View")
         dashboardView = viewMenu.addAction("View Dashboard")
         dashboardView.triggered.connect(lambda : updateDashboard())
+
         pluginManager = viewMenu.addAction("Plugin Manager")
         pluginManager.triggered.connect(lambda : updateDashboard())
+
+        definitionviewer = viewMenu.addAction("Item Definitions")
+        definitionviewer.triggered.connect(lambda : ItemDefinitionManager.ItemDictionary(self).exec())
 
         editMenu = self.menuBar.addMenu("Edit")
         undo = editMenu.addAction("Undo")

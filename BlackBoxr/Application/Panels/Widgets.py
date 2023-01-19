@@ -1,7 +1,7 @@
 import copy
 from typing import Optional
 from PySide6.QtWidgets import (
-    QLabel, QMainWindow, QDockWidget, QWidget,QTextEdit, QLineEdit, QDialog, QVBoxLayout, QScrollArea, QGridLayout, QComboBox, QDialogButtonBox, QSpacerItem, QSizePolicy, QHBoxLayout, QTreeWidget, QTreeWidgetItem, QAbstractItemView
+    QLabel, QCheckBox, QMainWindow, QDockWidget, QWidget,QTextEdit, QLineEdit, QDialog, QVBoxLayout, QScrollArea, QGridLayout, QComboBox, QDialogButtonBox, QSpacerItem, QSizePolicy, QHBoxLayout, QTreeWidget, QTreeWidgetItem, QAbstractItemView
 )
 from PySide6.QtGui import QFont, QFontMetrics, QTextCursor, QPainter, QPen, QPainterPath, QRegion
 from PySide6.QtCore import Signal, Slot, QRect, QSize, Qt
@@ -15,6 +15,7 @@ from PySide6.QtCharts import QChart, QChartView, QPieSeries
 import qdarktheme
 
 from BlackBoxr.misc.Datatypes import DesignElement, Element, System
+from BBData.BBData import *
 
 bold = QFont("Verdana", 16)
 bold.setBold(True)
@@ -1072,6 +1073,78 @@ class DisplayItem(QWidget):
         self.ownedItem.public[key] = value
         self.graphicsProxyWidget().scene().viewpane.renameItem(prevpublic[key], value)
         #print(utilities.diffdict(prevpublic, self.ownedItem.public))
+
+class ItemDisplay2(QWidget):
+
+    def __init__(self, item : GenericElement, parent: Optional[QtWidgets.QWidget]) -> None:
+        super().__init__(parent)
+        self.resize(380, 480)
+        self.ownedItem : GenericElement = item
+        self.fieldAreas : dict = {}
+        self.setupUI()
+        self.createFields()
+
+        # Rounded corners
+        path = QPainterPath()
+        path.addRoundedRect(0, 0, self.size().width(), self.size().height(), 10, 10)
+        mask = QRegion(path.toFillPolygon().toPolygon())
+        self.setMask(mask)
+
+    def setupUI(self):
+
+        self.verticallayout = QVBoxLayout(self)
+
+        self.idLabel = QLabel(str(self.ownedItem.uuid), self)
+
+        self.verticallayout.addWidget(self.idLabel)
+
+        self.scrollArea = QScrollArea(self)
+        self.scrollArea.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        self.scrollArea.setWidgetResizable(True)
+        self.scrollAreaContents = QtWidgets.QWidget()
+        self.scrollAreaContents.setGeometry(QtCore.QRect(0, 0, 380, 480))
+        self.scrollArea.setWidget(self.scrollAreaContents)
+        self.verticallayout.addWidget(self.scrollArea)
+        
+        self.mainLayout = QVBoxLayout(self.scrollAreaContents)
+        self.scrollAreaContents.setLayout(self.mainLayout)
+
+    def createFields(self):
+        for field in self.ownedItem.fields:
+            key = field.name
+            self.mainLayout.addWidget(QLabel(key, self.scrollAreaContents))
+            if isinstance(field, Radio):
+                for index, value in field.options.items():
+                    q = QCheckBox(value['name'], self.scrollAreaContents)
+                    q.setChecked(value['state'])
+                    q.stateChanged.connect(lambda x : field.setOption(index, x))
+                    self.mainLayout.addWidget(q)
+
+            elif isinstance(field, Checks):
+                for index, value in field.options.items():
+                    q = QCheckBox(value['name'], self.scrollAreaContents)
+                    q.setChecked(value['state'])
+                    q.stateChanged.connect(lambda x : field.setOption(index, x))
+                    self.mainLayout.addWidget(q)
+            elif isinstance(field, LongText):
+                pass
+            elif isinstance(field, ShortText):
+                pass
+
+        for i, (key, value) in enumerate(self.ownedItem.public.items()):
+            self.fieldAreas[key] = FieldWidget(key, self.scrollAreaContents)
+            self.fieldAreas[key].setText(value)
+            self.fieldAreas[key].edited.connect(lambda title, content : self.itemChanged(title, content))
+            self.mainLayout.addWidget(self.fieldAreas[key])
+
+    def updateFields(self):
+        for key, value in self.ownedItem.public.items():
+            self.fieldAreas[key].setText(value)
+
+    def itemChanged(self, key, value):
+        prevpublic = copy.deepcopy(self.ownedItem.public)
+        self.ownedItem.public[key] = value
+        self.graphicsProxyWidget().scene().viewpane.renameItem(prevpublic[key], value)
 
 class FieldWidget(QWidget):
 

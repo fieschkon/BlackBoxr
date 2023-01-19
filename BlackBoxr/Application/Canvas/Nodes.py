@@ -19,7 +19,7 @@ from PySide6.QtGui import QTransform, QPixmap, QAction, QPainter, QColor, QPen, 
 from BlackBoxr import utilities
 from BlackBoxr.Application import configuration
 
-from BlackBoxr.Application.Panels.Widgets import DisplayItem, EditableLabel, ExpandableLineEdit, Label
+from BlackBoxr.Application.Panels.Widgets import DisplayItem, EditableLabel, ExpandableLineEdit, ItemDisplay2, Label
 from BlackBoxr.Application import objects
 from BlackBoxr.misc.Datatypes import DesignElement, MoveCommand, NameEdit, RequirementElement
 from BlackBoxr.modules.ExtensionLoader import ExtensionLoader
@@ -29,7 +29,7 @@ from pathfinding.core.grid import Grid
 from pathfinding.finder.a_star import AStarFinder
 from pathfinding.finder.dijkstra import DijkstraFinder
 
-from BBData import Plugins
+from BBData import Plugins, BBData, Fields
 
 import qdarktheme
 
@@ -282,7 +282,15 @@ class RequirementNode(NodeBase):
         self.ownedRL.subscribe(self.onRLUpdate)
 
         self.proxy = QGraphicsProxyWidget(self)
-        self.lbl = DisplayItem(self.ownedRL)
+
+        checkoptions = [(0, 'TestA', False), (1, 'TestB', True)]
+        basicfield = BBData.Checks(checkoptions)
+
+        itemdef = BBData.ItemDefinition(fields=[basicfield])
+        element = BBData.GenericElement(template=itemdef)
+
+        self.lbl = ItemDisplay2(element, None)
+        #DisplayItem(self.ownedRL)
         self.proxy.setWidget(self.lbl)
         
         
@@ -672,7 +680,7 @@ class ArrowItem(QtWidgets.QGraphicsPathItem):
             ignoreditems.append(self._destinationPoint)
         else:
             d = self._destinationPoint
-        
+
         self.nodePath = ExtensionLoader.plugins[Plugins.PluginRole.PATHING][0].run(ref=self)
         path = QtGui.QPainterPath(s)
 
