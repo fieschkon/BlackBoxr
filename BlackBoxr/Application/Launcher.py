@@ -82,7 +82,7 @@ class StartupLauncher(QMainWindow):
     def startupOperations(self):
         # Collect Maximum Steps
         steps = len(ExtensionLoader.DiscoverExtensions())
-
+        steps += len(ExtensionLoader.discoverDependencies())
         self.ProgressBar.setMaximum(steps)
 
         self.InitExtensionLoader()
@@ -101,6 +101,8 @@ class StartupLauncher(QMainWindow):
             self.ProgressBar.setValue(self.currentstep)
         ExtensionLoader.onBuildProgress.connect(extensionLoaderProgress)
         ExtensionLoader.populatePlugins()
+        ExtensionLoader.installDependencies(ExtensionLoader.discoverDependencies())
+        ExtensionLoader.initializePlugins()
 
     def loadSettings(self):
         if not os.path.exists(objects.configfile):

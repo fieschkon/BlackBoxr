@@ -21,10 +21,6 @@ from BlackBoxr.Application import objects
 from BlackBoxr.misc.Datatypes import MoveCommand, NameEdit, RequirementElement
 from BlackBoxr.utilities import closestPoint, printMatrix, snapToGrid, transpose
 
-from pathfinding.core.diagonal_movement import DiagonalMovement
-from pathfinding.core.grid import Grid
-from pathfinding.finder.a_star import AStarFinder
-
 import igraph as ig
 from igraph import Graph, EdgeSeq, plot
 

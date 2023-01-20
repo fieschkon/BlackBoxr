@@ -24,10 +24,6 @@ from BlackBoxr.Application import objects
 from BlackBoxr.misc.Datatypes import DesignElement, MoveCommand, NameEdit, RequirementElement
 from BlackBoxr.modules.ExtensionLoader import ExtensionLoader
 from BlackBoxr.utilities import closestPoint, printMatrix, snapToGrid
-from pathfinding.core.diagonal_movement import DiagonalMovement
-from pathfinding.core.grid import Grid
-from pathfinding.finder.a_star import AStarFinder
-from pathfinding.finder.dijkstra import DijkstraFinder
 
 from BBData import Plugins, BBData, Fields
 

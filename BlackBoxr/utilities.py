@@ -3,6 +3,7 @@ import copy
 from datetime import datetime
 import logging
 import os
+from pkgutil import iter_modules
 import platform
 import random
 import string
@@ -65,8 +66,18 @@ def getDuration(then, now = datetime.now(), interval = "default"):
         'default': totalDuration()
     }
 
-def getFilesWithExtension(paths : list, extension : str = '.json'):
+def getFilesWithExtension(paths : list, extension : str = '.json', recursive=False):
+  def listdirs(rootdir):
+    paths = []
+    for it in os.scandir(rootdir):
+        if it.is_dir():
+            paths.append(it.path)
+            paths += listdirs(it)
+    return paths
+
   files = []
+  if recursive:
+    [paths.__iadd__(listdirs(root)) for root in paths]
   for path in paths:
     for file in os.listdir(path):
       if file.endswith(extension):
@@ -156,3 +167,26 @@ def transpose(mat):
 
 def lerp(pointA : QPointF, pointB : QPointF, percent : float):
   return pointA + (percent*(pointB - pointA))
+
+
+from itertools import chain
+from types import NoneType
+def iter_modules_recursive(paths : list[str], relativeto=None):
+  def listdirs(rootdir):
+    paths = []
+    for it in os.scandir(rootdir):
+        if it.is_dir():
+            paths.append(it.path)
+            paths += listdirs(it)
+    return paths
+
+  directoriesToScan = [item for sublist in [listdirs(path) for path in paths] for item in sublist]
+  directoriesToScan += paths
+  
+  moduleinfo = iter(())
+  for directory in directoriesToScan:
+    if relativeto != None:
+      directory = os.path.relpath(directory, relativeto)
+    moduleinfo = chain(moduleinfo, iter_modules([directory], str(directory.replace(os.sep, '.') + '.')))
+
+  return moduleinfo

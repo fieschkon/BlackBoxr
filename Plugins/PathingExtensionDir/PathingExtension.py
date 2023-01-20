@@ -7,6 +7,7 @@ from PySide6.QtCore import QRectF, QPointF
 from pathfinding.core.diagonal_movement import DiagonalMovement
 from pathfinding.core.grid import Grid
 from pathfinding.finder.dijkstra import DijkstraFinder
+
 GRIDSIZE = (25, 25)
 
 from BBData import Plugins
@@ -14,6 +15,10 @@ from BBData import Plugins
 class PathingPlugin(Plugins.PluginBase):
 
     role = Plugins.PluginRole.PATHING
+    requires = ['pathfinding']
+
+    def initialize(*args, **kwargs):
+        pass
 
     def run(*args, **kwargs):
         ignoreditems = []
