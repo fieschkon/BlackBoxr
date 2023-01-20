@@ -57,7 +57,6 @@ def run(args):
     launcher.show()
     launcher.startupOperations()
 
-
     #res = objects.qapp.primaryScreen().availableSize().toTuple()
     #Settings.winx = min(configuration.winx, res[0])
     #Settings.winy = min(configuration.winy, res[1])

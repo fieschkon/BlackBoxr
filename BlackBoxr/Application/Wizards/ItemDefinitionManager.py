@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (QAbstractButton, QApplication, QDialog, QDialogBu
     QWidget, QCheckBox)
 
 from BBData import BBData
+from BBData.Plugins import PluginRole
 from BBData.BBData import ItemDefinition, ItemTypeCollection
 
 class ItemDictionary(QDialog):
@@ -147,11 +148,25 @@ class DefinitionEditView(QWidget):
 
     def populateFields(self):
         for field in self.itemdef.fields:
+            match field.type.value:
+                case BBData.FieldType.CHECKS.value:
+                    editor = ChecksEdit(field)
+                case BBData.FieldType.LINETEXT.value:
+                    pass
+                case BBData.FieldType.LONGTEXT.value:
+                    pass
+                case BBData.FieldType.RADIO.value:
+                    pass
             itemreppr = QListWidgetItem()
-            editor = ChecksEdit(field)
+            itemreppr.setData(0, field)
             self.FieldEditWidgets.addItem(itemreppr)
             self.FieldEditWidgets.setItemWidget(itemreppr, editor)
             itemreppr.setSizeHint(editor.sizeHint())
+
+    def updateDefinition(self):
+        
+        for i in range(self.FieldEditWidgets.count()+1):
+            item = self.FieldEditWidgets.item(i)
 
     def setDefinitionName(self, name):
         self.TypeName.setText(name)
@@ -183,7 +198,6 @@ class DefinitionEditView(QWidget):
 
         self.horizontalLayout.addItem(self.horizontalSpacer)
 
-
         self.verticalLayout.addLayout(self.horizontalLayout)
 
         self.FieldEditWidgets = QListWidget(self)
@@ -204,8 +218,6 @@ class DefinitionEditView(QWidget):
         self.AddFieldButton.setLayoutDirection(Qt.LeftToRight)
 
         self.verticalLayout.addWidget(self.AddFieldButton, 0, Qt.AlignRight)
-
-
 
         self.label.setText(u"Item Type Name:")
         self.AddFieldButton.setText(u"Add Field")
@@ -245,10 +257,11 @@ class GenericFieldEdit(QWidget):
 
         self.verticalLayout.addWidget(self.widget)
 
-        self.widget_2 = QWidget(self)
-        self.widget_2.setObjectName(u"widget_2")
+        self.FieldsList = QListWidget(self)
+        self.FieldsList.setObjectName(u"widget_2")
+        self.FieldsList.setSizePolicy(sizePolicy)
 
-        self.verticalLayout.addWidget(self.widget_2)
+        self.verticalLayout.addWidget(self.FieldsList)
 
         self.AddOptionButton = QPushButton(self)
         self.AddOptionButton.setObjectName(u"AddOptionButton")
@@ -261,19 +274,39 @@ class GenericFieldEdit(QWidget):
         self.verticalLayout.addWidget(self.AddOptionButton, 0, Qt.AlignRight)
 
         self.FieldNameEdit.setText(self.field.name)
-        self.AddOptionButton.setText(u"Add Option")
+        self.AddOptionButton.setText(u" Add Option ")
         self.AddOptionButton.pressed.connect(self.optionAdded)
 
     def optionAdded(self):
         pass
 
+    def getField(self):
+        pass
+
 class ChecksEdit(GenericFieldEdit):
     def __init__(self, field: BBData.Checks, parent: Optional[QWidget] = None) -> None:
         super().__init__(field, parent)
+        
+        self.checkboxes = []
+    
+    def getField(self):
+        super().getField()
+        options = []
+        for i in self.checkboxes:
+            options.append(i.getTuple())
+        self.field = BBData.Checks(options, self.field.name)
+        return self.field
     
     def optionAdded(self):
         super().optionAdded()
-        self.verticalLayout.addWidget(EditableCheckbox(self))
+        itemreppr = QListWidgetItem()
+        editor = EditableCheckbox()
+        itemreppr.setData(0, editor)
+        self.FieldsList.addItem(itemreppr)
+        self.FieldsList.setItemWidget(itemreppr, editor)
+        itemreppr.setSizeHint(editor.sizeHint())
+        self.checkboxes.append(editor)
+        return editor
 
 class EditableCheckbox(QWidget):
     def __init__(self, parent: Optional[QWidget] = None) -> None:
@@ -294,6 +327,7 @@ class EditableCheckbox(QWidget):
         self.OptionNameLineEdit.setObjectName(u"OptionNameLineEdit")
 
         self.horizontalLayout.addWidget(self.OptionNameLineEdit)
+        self.OptionNameLineEdit.setText(self.fieldname)
 
         self.DefaultStateEdit = QCheckBox(self)
         self.DefaultStateEdit.setObjectName(u"DefaultStateEdit")
@@ -303,9 +337,11 @@ class EditableCheckbox(QWidget):
 
         self.OptionNameLineEdit.editingFinished.connect(self.onNameUpdate)
         self.DefaultStateEdit.stateChanged.connect(self.onStateChanged)
+        
+        self.setLayout(self.horizontalLayout)
 
-    def onNameUpdate(self, name):
-        self.fieldname = name
+    def onNameUpdate(self):
+        self.fieldname = self.OptionNameLineEdit.text()
     def onStateChanged(self, state):
         self.state = state
 
