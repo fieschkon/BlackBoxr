@@ -18,6 +18,7 @@ from BlackBoxr.Application import configuration
 import BlackBoxr.Application.Canvas.Nodes
 
 from BlackBoxr.Application import objects
+from BlackBoxr.Application.Canvas.Widgets import SearchBox
 from BlackBoxr.misc.Datatypes import MoveCommand, NameEdit, RequirementElement
 from BlackBoxr.utilities import closestPoint, printMatrix, snapToGrid, transpose
 
@@ -310,9 +311,17 @@ class RequirementsViewer(DiagramViewer):
 
     def contextMenuEvent(self, event) -> None:
         menu = QMenu(self)
-        reqcreate = menu.addAction("Create Requirement")
-        reqcreate.triggered.connect(lambda : self.reqscene.createRequirement(self.mapToScene(event.pos())))
+        wa = QWidgetAction(menu)
+        wa.setDefaultWidget(SearchBox())
+        menu.addAction(wa)
+        '''reqcreate = menu.addAction("Create Requirement")
+        reqcreate.triggered.connect(lambda : self.reqscene.createRequirement(self.mapToScene(event.pos())))'''
+        
+        menu.activateWindow()
+        wa.defaultWidget().SearchBar.setFocus(Qt.FocusReason.PopupFocusReason)
         menu.exec(self.mapToGlobal(event.pos()))
+        
+
         return super().contextMenuEvent(event)
 
     def wheelEvent(self, event: QWheelEvent, norep=False):

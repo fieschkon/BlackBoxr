@@ -12,6 +12,8 @@ from PySide6.QtWidgets import (QAbstractButton, QApplication, QDialog, QDialogBu
     QSizePolicy, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QFrame, QListView, QListWidget, QListWidgetItem,
     QWidget, QCheckBox)
 
+from BlackBoxr.Application import objects
+
 from BBData import BBData
 from BBData.Plugins import PluginRole
 from BBData.BBData import ItemDefinition, ItemTypeCollection
@@ -22,18 +24,12 @@ class ItemDictionary(QDialog):
         super().__init__(parent)
         self.setupUi()
         self.collections = []
+        self.activewidget = None
 
-        checkoptions = [(0, 'TestA', False), (1, 'TestB', True)]
-        basicfield = BBData.Checks(checkoptions)
-
-        itemdef = BBData.ItemDefinition(fields=[basicfield])
-
-        col = BBData.ItemTypeCollection()
-        col.addRequirement(itemdef)
-
-        self.addToExplorer(col)
+        #self.addToExplorer(col)
 
     def addToExplorer(self, collection : ItemTypeCollection):
+        self.collections.append(collection)
         titleitem = QTreeWidgetItem()
         titleitem.setText(0, collection.name)
         titleitem.setData(1, 0, collection)
@@ -112,7 +108,7 @@ class ItemDictionary(QDialog):
         self.buttonBox = QDialogButtonBox(self)
         self.buttonBox.setObjectName(u"buttonBox")
         self.buttonBox.setOrientation(Qt.Horizontal)
-        self.buttonBox.setStandardButtons(QDialogButtonBox.Apply|QDialogButtonBox.Cancel)
+        self.buttonBox.setStandardButtons(QDialogButtonBox.Save|QDialogButtonBox.Cancel)
 
         self.verticalLayout.addWidget(self.buttonBox)
 
@@ -124,21 +120,47 @@ class ItemDictionary(QDialog):
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
 
+    def accept(self) -> None:
+        super().accept()
+        self.save()
+
+    def save(self, dir=objects.defdir):
+        
+        for i in range(self.CollectionExplorer.topLevelItemCount()):
+            collectionitem = self.CollectionExplorer.topLevelItem(i)
+            collection = collectionitem.data(1, 0)
+            for i in range(collectionitem.childCount()):
+                collectionitem.child(i)
+                
+            print(collectionitem.data(1, 0).toDict())
+
+
     def onNewExplorerSelection(self, item : QTreeWidgetItem, col):
-        print(item, col)
-        try:
-            self.ItemDefinitionPanel.deleteLater()
-        except RuntimeError : pass
+        
+        if isinstance(self.activewidget, DefinitionEditPanel):
+            self.activewidget.updateDefinition()
+            self.activewidget.setHidden(True)
+            # Find definition
+            print(self.activewidget.itemdef.toDict())
+            
         
         for index in range(self.CollectionExplorer.topLevelItemCount()):
             if self.CollectionExplorer.topLevelItem(index) == item:
                 return
+        if item.data(2, 0) == None:
+            dep = DefinitionEditPanel(item.data(1, 0), self.widget)
+            dep.setDefinitionName(item.text(0))
+            item.setData(2, 0, dep)
+            self.verticalLayout_3.addWidget(dep)
+            self.activewidget = dep
+        else:
+            self.activewidget = item.data(2, 0)
+            self.activewidget.setHidden(False)
 
-        self.ItemDefinitionPanel = DefinitionEditView(item.data(1, 0), self.widget)
-        self.ItemDefinitionPanel.setDefinitionName(item.text(0))
-        self.verticalLayout_3.addWidget(self.ItemDefinitionPanel)
-
-class DefinitionEditView(QWidget):
+class DefinitionEditPanel(QWidget):
+    '''
+    Displays all of the fields contained within a definition
+    '''
     def __init__(self, itemdef : BBData.ItemDefinition, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.setupUi()
@@ -150,7 +172,7 @@ class DefinitionEditView(QWidget):
         for field in self.itemdef.fields:
             match field.type.value:
                 case BBData.FieldType.CHECKS.value:
-                    editor = ChecksEdit(field)
+                    editor = ChecksEditPanel(field)
                 case BBData.FieldType.LINETEXT.value:
                     pass
                 case BBData.FieldType.LONGTEXT.value:
@@ -163,10 +185,17 @@ class DefinitionEditView(QWidget):
             self.FieldEditWidgets.setItemWidget(itemreppr, editor)
             itemreppr.setSizeHint(editor.sizeHint())
 
-    def updateDefinition(self):
-        
-        for i in range(self.FieldEditWidgets.count()+1):
+    def getDefinition(self):
+        fields = []
+        for i in range(self.FieldEditWidgets.count()):
             item = self.FieldEditWidgets.item(i)
+            fields.append(self.FieldEditWidgets.itemWidget(item).getField())
+        return BBData.ItemDefinition(self.itemdef.name, fields)
+
+    def updateDefinition(self):
+        definition = self.getDefinition()
+        definition.uuid = self.itemdef.uuid
+        self.itemdef = definition
 
     def setDefinitionName(self, name):
         self.TypeName.setText(name)
@@ -222,9 +251,12 @@ class DefinitionEditView(QWidget):
         self.label.setText(u"Item Type Name:")
         self.AddFieldButton.setText(u"Add Field")
 
-
-
 class GenericFieldEdit(QWidget):
+
+    '''
+    Generic widget supporting renaming the field and adding options
+    '''
+
     def __init__(self, field : BBData.Field, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.field = field
@@ -283,7 +315,15 @@ class GenericFieldEdit(QWidget):
     def getField(self):
         pass
 
-class ChecksEdit(GenericFieldEdit):
+    def updateField(self):
+        field = self.getField()
+        field.uuid = self.field.uuid
+        self.field = field
+
+class ChecksEditPanel(GenericFieldEdit):
+    '''
+    Widget for adding options to the Checks
+    '''
     def __init__(self, field: BBData.Checks, parent: Optional[QWidget] = None) -> None:
         super().__init__(field, parent)
         
@@ -308,7 +348,22 @@ class ChecksEdit(GenericFieldEdit):
         self.checkboxes.append(editor)
         return editor
 
+    def getOptions(self):
+        fields = []
+        for i in range(self.FieldsList.count()):
+            item = self.FieldsList.item(i)
+            tup = item.data(0).getTuple()
+            fields.append((i, tup[0], tup[1]))
+        return fields
+
+    def getField(self):
+        super().getField()
+        return BBData.Checks(self.getOptions(), self.field.name)
+
+
+
 class EditableCheckbox(QWidget):
+    ''' Widget to allow for changing the text on a checkbox'''
     def __init__(self, parent: Optional[QWidget] = None) -> None:
         super().__init__(parent)
         self.fieldname = 'Option Name'

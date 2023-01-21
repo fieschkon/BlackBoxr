@@ -31,6 +31,8 @@ tmpdir = user_cache_dir(AppName, Org)
 
 logdir = user_log_dir(AppName, Org)
 
+defdir = os.path.join(datadir, 'Definitions')
+
 makeDir(datadir)
 makeDir(tmpdir)
 makeDir(logdir)
